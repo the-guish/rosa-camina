@@ -1,0 +1,198 @@
+/* Mobile first: every rule here targets the phone. Wider screens are the
+   exception at the bottom of the file. */
+
+:root {
+  --bg: #fdf7f9;
+  --surface: #ffffff;
+  --line: #eadbe1;
+  --text: #2b1a20;
+  --muted: #7d6670;
+  --accent: #9d174d;
+  --accent-soft: #fce7ef;
+  --good: #10714e;
+  --good-soft: #dcf5e9;
+  --radius: 14px;
+  --tap: 44px;              /* minimum comfortable tap target */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171114;
+    --surface: #221820;
+    --line: #3a2a33;
+    --text: #f4e9ee;
+    --muted: #b09aa5;
+    --accent: #f9a8c9;
+    --accent-soft: #3d1c2c;
+    --good: #6ee7b7;
+    --good-soft: #10352a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
+  overflow-wrap: break-word;
+}
+
+/* ---------- top bar ---------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: calc(.75rem + env(safe-area-inset-top)) 1rem .75rem;
+  padding-left: calc(1rem + env(safe-area-inset-left));
+  padding-right: calc(1rem + env(safe-area-inset-right));
+}
+
+.topbar h1 {
+  margin: 0 0 .6rem;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: .02em;
+  color: var(--accent);
+}
+
+.searchbox { position: relative; }
+
+.searchbox .icon {
+  position: absolute;
+  left: .8rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+#q {
+  width: 100%;
+  min-height: var(--tap);
+  padding: .7rem 2.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;            /* 16px or iOS Safari zooms in on focus */
+  appearance: none;
+}
+
+#q:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+#q::-webkit-search-cancel-button { display: none; }
+
+#clear {
+  position: absolute;
+  right: .25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ---------- results ---------- */
+
+main {
+  padding: 1rem;
+  padding-left: calc(1rem + env(safe-area-inset-left));
+  padding-right: calc(1rem + env(safe-area-inset-right));
+}
+
+.status { margin: .25rem 0 1rem; min-height: 1.3em; color: var(--muted); font-size: .9rem; }
+
+.results { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: .8rem .9rem;
+}
+
+.card .name { font-weight: 600; margin-bottom: .55rem; }
+
+/* the words that matched what was typed */
+.card .name mark {
+  background: var(--accent-soft);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 .1em;
+}
+
+.card .row {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: .78rem;
+  padding: .18rem .5rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.tag.size { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.tag.best { background: var(--good-soft); color: var(--good); font-weight: 600; }
+
+.card .price {
+  margin-left: auto;
+  font-size: 1.15rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.card .unit {
+  width: 100%;
+  color: var(--muted);
+  font-size: .82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+footer {
+  margin-top: 1.5rem;
+  padding: 0 1rem;
+  color: var(--muted);
+  font-size: .78rem;
+  text-align: center;
+}
+
+/* ---------- wider screens ---------- */
+
+@media (min-width: 640px) {
+  .topbar { padding: 1rem 1.5rem; }
+  .topbar h1 { font-size: 1.2rem; }
+  .topbar > *, main, footer { max-width: 44rem; margin-inline: auto; }
+  main { padding: 1.5rem; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card { transition: border-color .15s ease; }
+}
