@@ -9,8 +9,6 @@
   --muted: #7d6670;
   --accent: #9d174d;
   --accent-soft: #fce7ef;
-  --good: #10714e;
-  --good-soft: #dcf5e9;
   --radius: 14px;
   --tap: 44px;              /* minimum comfortable tap target */
 }
@@ -24,8 +22,6 @@
     --muted: #b09aa5;
     --accent: #f9a8c9;
     --accent-soft: #3d1c2c;
-    --good: #6ee7b7;
-    --good-soft: #10352a;
   }
 }
 
@@ -159,7 +155,6 @@ main {
 }
 
 .tag.size { background: transparent; color: var(--muted); border: 1px solid var(--line); }
-.tag.best { background: var(--good-soft); color: var(--good); font-weight: 600; }
 
 .card .price {
   margin-left: auto;
