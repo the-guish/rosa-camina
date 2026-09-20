@@ -83,7 +83,7 @@ function terms(text) {
 function buildIndex(items) {
   index = items.map(item => ({
     item,
-    terms: terms(`${item.n} ${item.s} ${item.g}`)
+    terms: terms([item.n, item.s, item.g].filter(Boolean).join(' '))
   }));
 }
 
@@ -109,7 +109,7 @@ function nameWithHits(name, wanted) {
   return el;
 }
 
-function card(item, wanted, isBest) {
+function card(item, wanted) {
   const li = document.createElement('li');
   li.className = 'card';
 
@@ -120,7 +120,6 @@ function card(item, wanted, isBest) {
     <div class="row">
       <span class="tag store"></span>
       ${size ? '<span class="tag size"></span>' : ''}
-      ${isBest ? '<span class="tag best">Mejor precio</span>' : ''}
       <span class="price"></span>
       ${item.pp !== undefined ? '<span class="unit"></span>' : ''}
     </div>`;
@@ -136,18 +135,9 @@ function card(item, wanted, isBest) {
 }
 
 function render(items, wanted) {
-  // Cheapest per unit wins the badge, but only within its own product group
-  // and only among rows whose size we could actually parse.
-  const best = new Map();
-  for (const item of items) {
-    if (item.pp === undefined) continue;
-    const current = best.get(item.g);
-    if (!current || item.pp < current.pp) best.set(item.g, item);
-  }
-
-  $results.replaceChildren(
-    ...items.map(item => card(item, wanted, best.get(item.g) === item))
-  );
+  // No row is singled out: the page states prices and the reader compares
+  // them. Deciding which listings are the same product is deferred.
+  $results.replaceChildren(...items.map(item => card(item, wanted)));
 
   const n = items.length;
   $status.textContent = n ? `${n} ${n === 1 ? 'precio' : 'precios'}` : 'Sin resultados.';
