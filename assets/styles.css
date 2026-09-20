@@ -113,42 +113,6 @@ body {
   cursor: pointer;
 }
 
-/* ---------- autocomplete ---------- */
-
-#suggestions {
-  position: absolute;
-  top: calc(100% + .35rem);
-  left: 0;
-  right: 0;
-  z-index: 20;
-  margin: 0;
-  padding: .25rem;
-  list-style: none;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: 0 12px 28px rgb(0 0 0 / .16);
-  max-height: 55vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-#suggestions li {
-  min-height: var(--tap);
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  padding: .5rem .7rem;
-  border-radius: 10px;
-  cursor: pointer;
-}
-
-#suggestions li[aria-selected="true"] { background: var(--accent-soft); }
-
-#suggestions .hit { color: var(--muted); }
-#suggestions .hit b { color: var(--text); font-weight: 650; }
-#suggestions .n { margin-left: auto; color: var(--muted); font-size: .8rem; }
-
 /* ---------- results ---------- */
 
 main {
@@ -157,7 +121,7 @@ main {
   padding-right: calc(1rem + env(safe-area-inset-right));
 }
 
-.status { margin: .25rem 0 1rem; color: var(--muted); font-size: .9rem; }
+.status { margin: .25rem 0 1rem; min-height: 1.3em; color: var(--muted); font-size: .9rem; }
 
 .results { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
 
@@ -169,6 +133,14 @@ main {
 }
 
 .card .name { font-weight: 600; margin-bottom: .55rem; }
+
+/* the words that matched what was typed */
+.card .name mark {
+  background: var(--accent-soft);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 .1em;
+}
 
 .card .row {
   display: flex;

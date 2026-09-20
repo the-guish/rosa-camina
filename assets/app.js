@@ -1,23 +1,30 @@
 // rosa camina — read-only price comparison. Everything runs in the browser:
 // the data is a static JSON file, the search index is built on load, and the
 // payload is cached in IndexedDB so repeat visits start instantly.
+//
+// There is no product picker: the result list *is* the search. Typing filters
+// every price matching the text, so two stores' names for the same bottle sit
+// next to each other instead of being collapsed into one "product".
 
 const MANIFEST = 'data/manifest.json';
 const DB_NAME = 'rosa-camina';
 const STORE = 'cache';
 const KEY = 'payload';
 
+const MIN_QUERY = 2;      // below this the list stays empty
+const DEBOUNCE_MS = 150;  // redraw at most this often while typing
+
 const $q = document.getElementById('q');
 const $clear = document.getElementById('clear');
-const $suggestions = document.getElementById('suggestions');
 const $results = document.getElementById('results');
 const $status = document.getElementById('status');
 const $footer = document.getElementById('footer');
 
 const money = new Intl.NumberFormat('es-UY', { style: 'currency', currency: 'UYU' });
 
-let index = [];      // [{ item, terms }]
-let cursor = -1;     // highlighted suggestion
+let index = [];        // [{ item, terms }]
+let ready = false;     // data loaded at least once
+let timer = 0;
 
 // ---------------------------------------------------------------- storage
 // Every access is guarded: private windows, blocked site data and Safari's
@@ -80,9 +87,7 @@ function buildIndex(items) {
   }));
 }
 
-function search(query) {
-  const wanted = terms(query);
-  if (!wanted.length) return index.map(entry => entry.item);
+function search(wanted) {
   return index
     .filter(entry => wanted.every(w => entry.terms.some(t => t.startsWith(w))))
     .map(entry => entry.item);
@@ -90,11 +95,47 @@ function search(query) {
 
 // ----------------------------------------------------------------- render
 
-function sizeOf(item) {
-  return item.q === undefined ? null : `${item.q} ${item.u}`;
+function nameWithHits(name, wanted) {
+  const el = document.createElement('span');
+  // Mark the whole word when it starts with one of the typed terms, so the
+  // reason a row matched is visible without a separate suggestion list.
+  for (const word of name.split(/(\s+)/)) {
+    const plain = terms(word)[0] || '';
+    const hit = plain && wanted.some(w => plain.startsWith(w));
+    const node = document.createElement(hit ? 'mark' : 'span');
+    node.textContent = word;
+    el.append(node);
+  }
+  return el;
 }
 
-function render(items) {
+function card(item, wanted, isBest) {
+  const li = document.createElement('li');
+  li.className = 'card';
+
+  const size = item.q === undefined ? null : `${item.q} ${item.u}`;
+
+  li.innerHTML = `
+    <div class="name"></div>
+    <div class="row">
+      <span class="tag store"></span>
+      ${size ? '<span class="tag size"></span>' : ''}
+      ${isBest ? '<span class="tag best">Mejor precio</span>' : ''}
+      <span class="price"></span>
+      ${item.pp !== undefined ? '<span class="unit"></span>' : ''}
+    </div>`;
+
+  li.querySelector('.name').append(nameWithHits(item.n, wanted));
+  li.querySelector('.store').textContent = item.s;
+  if (size) li.querySelector('.size').textContent = size;
+  li.querySelector('.price').textContent = money.format(item.p);
+  if (item.pp !== undefined) {
+    li.querySelector('.unit').textContent = `${money.format(item.pp)} por ${item.pu}`;
+  }
+  return li;
+}
+
+function render(items, wanted) {
   // Cheapest per unit wins the badge, but only within its own product group
   // and only among rows whose size we could actually parse.
   const best = new Map();
@@ -104,157 +145,58 @@ function render(items) {
     if (!current || item.pp < current.pp) best.set(item.g, item);
   }
 
-  $results.replaceChildren(...items.map(item => {
-    const li = document.createElement('li');
-    li.className = 'card';
-
-    const size = sizeOf(item);
-    const isBest = best.get(item.g) === item;
-
-    li.innerHTML = `
-      <div class="name"></div>
-      <div class="row">
-        <span class="tag store"></span>
-        ${size ? '<span class="tag size"></span>' : ''}
-        ${isBest ? '<span class="tag best">Mejor precio</span>' : ''}
-        <span class="price"></span>
-        ${item.pp !== undefined ? '<span class="unit"></span>' : ''}
-      </div>`;
-
-    li.querySelector('.name').textContent = item.n;
-    li.querySelector('.store').textContent = item.s;
-    if (size) li.querySelector('.size').textContent = size;
-    li.querySelector('.price').textContent = money.format(item.p);
-    if (item.pp !== undefined) {
-      li.querySelector('.unit').textContent = `${money.format(item.pp)} por ${item.pu}`;
-    }
-    return li;
-  }));
+  $results.replaceChildren(
+    ...items.map(item => card(item, wanted, best.get(item.g) === item))
+  );
 
   const n = items.length;
-  $status.textContent = n === 0
-    ? 'Sin resultados.'
-    : `${n} ${n === 1 ? 'precio' : 'precios'}`;
+  $status.textContent = n ? `${n} ${n === 1 ? 'precio' : 'precios'}` : 'Sin resultados.';
 }
 
-// ------------------------------------------------------------ autocomplete
-
-function suggestionsFor(query, found) {
-  if (!query.trim()) return [];
-  const seen = new Set();
-  const out = [];
-  for (const item of found) {
-    if (seen.has(item.n)) continue;
-    seen.add(item.n);
-    out.push(item);
-    if (out.length === 6) break;
-  }
-  return out;
+// The landing state, and anything shorter than MIN_QUERY: no rows, just a hint.
+function idle() {
+  $results.replaceChildren();
+  $status.textContent = ready
+    ? `Escribí al menos ${MIN_QUERY} letras para ver precios.`
+    : 'Cargando precios…';
 }
 
-function highlight(name, query) {
-  const wanted = terms(query);
-  const el = document.createElement('span');
-  el.className = 'hit';
-  // Bold the whole word when it starts with one of the typed terms.
-  for (const word of name.split(/(\s+)/)) {
-    const plain = terms(word)[0] || '';
-    const hit = wanted.some(w => plain.startsWith(w));
-    const node = document.createElement(hit ? 'b' : 'span');
-    node.textContent = word;
-    el.append(node);
-  }
-  return el;
-}
-
-function showSuggestions(query, found) {
-  const options = suggestionsFor(query, found);
-  cursor = -1;
-
-  if (!options.length) {
-    closeSuggestions();
+function update() {
+  const wanted = terms($q.value);
+  const long = wanted.filter(w => w.length >= MIN_QUERY);
+  if (!long.length) {
+    idle();
     return;
   }
-
-  $suggestions.replaceChildren(...options.map((item, i) => {
-    const li = document.createElement('li');
-    li.id = `suggestion-${i}`;
-    li.setAttribute('role', 'option');
-    li.setAttribute('aria-selected', 'false');
-    li.dataset.name = item.n;
-    li.append(highlight(item.n, query));
-
-    const price = document.createElement('span');
-    price.className = 'n';
-    price.textContent = money.format(item.p);
-    li.append(price);
-
-    li.addEventListener('pointerdown', event => {
-      event.preventDefault();   // keep focus so the keyboard does not flicker
-      choose(item.n);
-    });
-    return li;
-  }));
-
-  $suggestions.hidden = false;
-  $q.setAttribute('aria-expanded', 'true');
-}
-
-function closeSuggestions() {
-  $suggestions.hidden = true;
-  $suggestions.replaceChildren();
-  $q.setAttribute('aria-expanded', 'false');
-  $q.removeAttribute('aria-activedescendant');
-  cursor = -1;
-}
-
-function moveCursor(delta) {
-  const options = [...$suggestions.children];
-  if (!options.length) return;
-  if (cursor >= 0) options[cursor].setAttribute('aria-selected', 'false');
-  cursor = (cursor + delta + options.length) % options.length;
-  options[cursor].setAttribute('aria-selected', 'true');
-  options[cursor].scrollIntoView({ block: 'nearest' });
-  $q.setAttribute('aria-activedescendant', options[cursor].id);
-}
-
-function choose(name) {
-  $q.value = name;
-  $clear.hidden = false;
-  closeSuggestions();
-  render(search(name));
+  render(search(wanted), wanted);
 }
 
 // ------------------------------------------------------------------ events
 
 $q.addEventListener('input', () => {
-  const found = search($q.value);
   $clear.hidden = !$q.value;
-  render(found);
-  showSuggestions($q.value, found);
+  clearTimeout(timer);
+  timer = setTimeout(update, DEBOUNCE_MS);
 });
 
 $q.addEventListener('keydown', event => {
-  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    moveCursor(event.key === 'ArrowDown' ? 1 : -1);
+  if (event.key === 'Escape') {
+    $q.value = '';
+    $clear.hidden = true;
+    update();
   } else if (event.key === 'Enter') {
-    event.preventDefault();
-    if (cursor >= 0) choose($suggestions.children[cursor].dataset.name);
-    else closeSuggestions();
+    event.preventDefault();   // nothing to submit; fold the keyboard away
+    clearTimeout(timer);
+    update();
     $q.blur();
-  } else if (event.key === 'Escape') {
-    closeSuggestions();
   }
 });
-
-$q.addEventListener('blur', () => setTimeout(closeSuggestions, 120));
 
 $clear.addEventListener('click', () => {
   $q.value = '';
   $clear.hidden = true;
-  closeSuggestions();
-  render(search(''));
+  clearTimeout(timer);
+  update();
   $q.focus();
 });
 
@@ -264,7 +206,8 @@ $clear.addEventListener('click', () => {
 
 function apply(payload) {
   buildIndex(payload.items);
-  render(search($q.value));
+  ready = true;
+  update();
   $footer.textContent =
     `${payload.items.length} precios · ${payload.stores.join(' · ')} · datos del ${payload.generated}`;
 }

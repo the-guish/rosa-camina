@@ -17,18 +17,16 @@
   <div class="searchbox">
     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
     <input id="q" type="search" placeholder="Buscar un producto…"
-           role="combobox" aria-expanded="false" aria-controls="suggestions"
-           aria-label="Buscar un producto" aria-autocomplete="list"
+           aria-label="Buscar un producto" aria-controls="results"
            autocomplete="off" autocorrect="off" autocapitalize="off"
            spellcheck="false" enterkeyhint="search">
     <button id="clear" type="button" aria-label="Limpiar búsqueda" hidden>&times;</button>
-    <ul id="suggestions" role="listbox" aria-label="Sugerencias" hidden></ul>
   </div>
 </header>
 
 <main>
   <p id="status" class="status" role="status">Cargando precios…</p>
-  <ol id="results" class="results"></ol>
+  <ol id="results" class="results" aria-live="polite"></ol>
 </main>
 
 <footer id="footer"></footer>
