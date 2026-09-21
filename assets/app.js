@@ -90,7 +90,20 @@ function buildIndex(items) {
 function search(wanted) {
   return index
     .filter(entry => wanted.every(w => entry.terms.some(t => t.startsWith(w))))
-    .map(entry => entry.item);
+    .map(entry => entry.item)
+    .sort(byUnitPrice);
+}
+
+// The data file is ordered by store and item id, which is what keeps its
+// diffs small; it says nothing about what a reader wants to see first. So
+// the page decides: cheapest per kilo or litre, and rows whose size the
+// store never published last, since they cannot be compared.
+function byUnitPrice(a, b) {
+  const aUnknown = a.pp === undefined;
+  const bUnknown = b.pp === undefined;
+  if (aUnknown !== bUnknown) return aUnknown ? 1 : -1;
+  if (!aUnknown && a.pp !== b.pp) return a.pp - b.pp;
+  return a.n.localeCompare(b.n, 'es');
 }
 
 // ----------------------------------------------------------------- render
