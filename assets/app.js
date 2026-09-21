@@ -6,13 +6,17 @@
 // every price matching the text, so two stores' names for the same bottle sit
 // next to each other instead of being collapsed into one "product".
 
-// One copy of this script serves every country. The page that loads it
-// (uy/index.html, ar/index.html) says which one it is on <html>, and relative
-// URLs resolve against that page, so 'data/…' is the country's own folder.
-const { country, locale, currency } = document.documentElement.dataset;
+// One copy of this script serves every page. The page that loads it says
+// which one it is on <html>. A country page (uy/, ar/) reads its own folder:
+// relative URLs resolve against the page, so 'data/…' is that country's.
+// The world page (mundo/) names the countries it spans in data-countries,
+// reads each one's folder ('../uy/data/…') and shows every price in dollars.
+const { country, locale, currency, countries } = document.documentElement.dataset;
+const WORLD = countries ? countries.split(' ') : null;
 
 const MANIFEST = 'data/manifest.json';
-const DB_NAME = `rosa-camina-${country}`;   // same origin, so one cache per country
+const RATES = 'data/rates.json';
+const dbName = cc => `rosa-camina-${cc}`;   // same origin, so one cache per country
 const STORE = 'cache';
 const KEY = 'payload';
 
@@ -35,18 +39,18 @@ let timer = 0;
 // Every access is guarded: private windows, blocked site data and Safari's
 // eviction of script-writable storage all make these throw or come back empty.
 
-function openDb() {
+function openDb(cc) {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(dbName(cc), 1);
     req.onupgradeneeded = () => req.result.createObjectStore(STORE);
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
-async function cacheGet() {
+async function cacheGet(cc = country) {
   try {
-    const db = await openDb();
+    const db = await openDb(cc);
     return await new Promise((resolve, reject) => {
       const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(KEY);
       req.onsuccess = () => resolve(req.result || null);
@@ -57,9 +61,9 @@ async function cacheGet() {
   }
 }
 
-async function cacheSet(value) {
+async function cacheSet(value, cc = country) {
   try {
-    const db = await openDb();
+    const db = await openDb(cc);
     await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, 'readwrite');
       tx.objectStore(STORE).put(value, KEY);
@@ -85,10 +89,13 @@ function terms(text) {
     .match(/[a-z0-9%]+/g) || [];
 }
 
+// Shown on a card of the world page, and searchable there: "argentina yerba".
+const COUNTRY_NAMES = { uy: 'Uruguay', ar: 'Argentina' };
+
 function buildIndex(items) {
   index = items.map(item => ({
     item,
-    terms: terms([item.n, item.s, item.g].filter(Boolean).join(' '))
+    terms: terms([item.n, item.s, item.g, item.c && COUNTRY_NAMES[item.c]].filter(Boolean).join(' '))
   }));
 }
 
@@ -136,6 +143,7 @@ function card(item, wanted) {
   li.innerHTML = `
     <div class="name"></div>
     <div class="row">
+      ${item.c ? '<span class="tag place"></span>' : ''}
       <span class="tag store"></span>
       ${size ? '<span class="tag size"></span>' : ''}
       <span class="price"></span>
@@ -143,6 +151,7 @@ function card(item, wanted) {
     </div>`;
 
   li.querySelector('.name').append(nameWithHits(item.n, wanted));
+  if (item.c) li.querySelector('.place').textContent = COUNTRY_NAMES[item.c] || item.c;
   li.querySelector('.store').textContent = item.s;
   if (size) li.querySelector('.size').textContent = size;
   li.querySelector('.price').textContent = money.format(item.p);
@@ -247,4 +256,57 @@ async function boot() {
   }
 }
 
-boot();
+// ------------------------------------------------------------------- world
+// The world page has no data of its own. For each country it takes the
+// catalogue (from that country's cache when the manifest says it is current,
+// which also warms the cache for the country page) and the exchange rates,
+// and converts every price to dollars once, here, on load: results are sorted
+// by price per kilo or litre across countries, so every match would need
+// converting on every keystroke otherwise. The conversion happens on the
+// in-memory rows only. What is cached stays in local currency, because the
+// country pages read the same cache.
+
+async function loadCountry(cc) {
+  const base = `../${cc}/`;
+  const manifest = await (await fetch(base + MANIFEST, { cache: 'no-cache' })).json();
+  let cached = await cacheGet(cc);
+  if (!cached || cached.version !== manifest.version) {
+    const payload = await (await fetch(base + manifest.url)).json();
+    cached = { version: manifest.version, payload };
+    await cacheSet(cached, cc);
+  }
+  const quotes = await (await fetch(base + RATES, { cache: 'no-cache' })).json();
+  const known = quotes.rates.filter(r => r !== null);
+  if (!known.length) throw new Error(`no exchange rate for ${cc}`);
+  return { cc, payload: cached.payload, rate: known[known.length - 1], currency: quotes.currency };
+}
+
+function inDollars({ cc, payload, rate }) {
+  return payload.items.map(item => {
+    const row = { ...item, c: cc, p: item.p / rate };
+    if (item.pp !== undefined) row.pp = item.pp / rate;
+    return row;
+  });
+}
+
+async function bootWorld() {
+  const loaded = await Promise.allSettled(WORLD.map(loadCountry));
+  const ok = loaded.filter(r => r.status === 'fulfilled').map(r => r.value);
+  if (!ok.length) {
+    $status.textContent = 'No se pudieron cargar los precios.';
+    return;
+  }
+  buildIndex(ok.flatMap(inDollars));
+  ready = true;
+  update();
+
+  const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
+  const parts = ok.map(c =>
+    `${COUNTRY_NAMES[c.cc]}: ${c.payload.items.length} precios del ${c.payload.generated}, ` +
+    `1 US$ = ${number.format(c.rate)} ${c.currency}`);
+  const missing = WORLD.filter(cc => !ok.some(c => c.cc === cc)).map(cc => COUNTRY_NAMES[cc] || cc);
+  if (missing.length) parts.push(`sin datos de ${missing.join(', ')}`);
+  $footer.textContent = parts.join(' · ');
+}
+
+if (WORLD) bootWorld(); else boot();

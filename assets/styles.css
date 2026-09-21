@@ -158,6 +158,9 @@ main {
   white-space: nowrap;
 }
 
+/* the world page: which country a price is from */
+.tag.place { background: var(--accent); color: var(--surface); }
+
 .tag.size { background: transparent; color: var(--muted); border: 1px solid var(--line); }
 
 .card .price {
@@ -192,6 +195,7 @@ main {
 .country-link:hover, .country-link:focus-visible { border-color: var(--accent); }
 
 .country-link .flag { font-size: 1.4rem; line-height: 1; }
+.country-link .hint { margin-left: auto; color: var(--muted); font-size: .82rem; font-weight: 400; }
 
 footer {
   margin-top: 1.5rem;
