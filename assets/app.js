@@ -318,12 +318,53 @@ function scannerDialog() {
   return $scanner;
 }
 
+// A phone has several rear cameras and "the rear one" may be the ultra-wide,
+// whose focus is fixed: a product held close is a blur and the shelf a metre
+// behind it is sharp. So the camera wanted is one that can refocus by itself.
+// The first answer is kept when it can; otherwise the other rear cameras are
+// tried (their labels are readable once the permission is granted), and if
+// none can, the first answer's kind is what this phone has.
+const SHARP = { width: { ideal: 1920 }, height: { ideal: 1080 } };   // the default is 640x480
+const canRefocus = media =>
+  (media.getVideoTracks()[0].getCapabilities?.().focusMode || []).includes('continuous');
+const stop = media => media.getTracks().forEach(track => track.stop());
+
+async function openCamera() {
+  const first = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', ...SHARP } });
+  if (canRefocus(first)) return first;
+  const used = first.getVideoTracks()[0].getSettings().deviceId;
+  const others = (await navigator.mediaDevices.enumerateDevices())
+    .filter(d => d.kind === 'videoinput' && d.deviceId !== used && /back|rear|environment|trasera/i.test(d.label));
+  if (!others.length) return first;
+  stop(first);   // a phone rarely lends two cameras at once
+  for (const { deviceId } of others) {
+    try {
+      const media = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId }, ...SHARP } });
+      if (canRefocus(media)) return media;
+      stop(media);
+    } catch { /* that one would not open; try the next */ }
+  }
+  return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', ...SHARP } });
+}
+
+// Keep refocusing, and zoom in a little: every lens has a nearest distance it
+// can focus at, and a small code fills enough of the frame from beyond it.
+async function tune(media) {
+  const track = media.getVideoTracks()[0];
+  const can = track.getCapabilities?.() || {};
+  const wanted = {};
+  if ((can.focusMode || []).includes('continuous')) wanted.focusMode = 'continuous';
+  if (can.zoom) wanted.zoom = Math.min(Math.max(2, can.zoom.min), can.zoom.max);
+  try { await track.applyConstraints({ advanced: [wanted] }); } catch { /* it scans untuned */ }
+}
+
 async function scan() {
   const dialog = scannerDialog();
   const video = dialog.querySelector('video');
   let mine;
   try {
-    mine = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    mine = await openCamera();
+    await tune(mine);
   } catch {
     $status.textContent = 'No se pudo usar la cámara. Revisá el permiso del sitio.';
     return;
