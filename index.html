@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#9d174d">
 <title>rosa camina</title>
-<meta name="description" content="Comparador de precios de supermercados en Uruguay.">
+<meta name="description" content="Comparador de precios de supermercados en Uruguay y Argentina.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌹</text></svg>">
 <link rel="stylesheet" href="assets/styles.css">
 </head>
@@ -14,23 +14,15 @@
 
 <header class="topbar">
   <h1>rosa camina</h1>
-  <div class="searchbox">
-    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-    <input id="q" type="search" placeholder="Buscar un producto…"
-           aria-label="Buscar un producto" aria-controls="results"
-           autocomplete="off" autocorrect="off" autocapitalize="off"
-           spellcheck="false" enterkeyhint="search">
-    <button id="clear" type="button" aria-label="Limpiar búsqueda" hidden>&times;</button>
-  </div>
 </header>
 
 <main>
-  <p id="status" class="status" role="status">Cargando precios…</p>
-  <ol id="results" class="results" aria-live="polite"></ol>
+  <p class="status">Precios de supermercados. Elegí un país.</p>
+  <ul class="countries">
+    <li><a class="card country-link" href="uy/"><span class="flag" aria-hidden="true">🇺🇾</span> Uruguay</a></li>
+    <li><a class="card country-link" href="ar/"><span class="flag" aria-hidden="true">🇦🇷</span> Argentina</a></li>
+  </ul>
 </main>
 
-<footer id="footer"></footer>
-
-<script type="module" src="assets/app.js"></script>
 </body>
 </html>

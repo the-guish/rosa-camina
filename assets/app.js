@@ -6,8 +6,13 @@
 // every price matching the text, so two stores' names for the same bottle sit
 // next to each other instead of being collapsed into one "product".
 
+// One copy of this script serves every country. The page that loads it
+// (uy/index.html, ar/index.html) says which one it is on <html>, and relative
+// URLs resolve against that page, so 'data/…' is the country's own folder.
+const { country, locale, currency } = document.documentElement.dataset;
+
 const MANIFEST = 'data/manifest.json';
-const DB_NAME = 'rosa-camina';
+const DB_NAME = `rosa-camina-${country}`;   // same origin, so one cache per country
 const STORE = 'cache';
 const KEY = 'payload';
 
@@ -20,7 +25,7 @@ const $results = document.getElementById('results');
 const $status = document.getElementById('status');
 const $footer = document.getElementById('footer');
 
-const money = new Intl.NumberFormat('es-UY', { style: 'currency', currency: 'UYU' });
+const money = new Intl.NumberFormat(locale, { style: 'currency', currency });
 
 let index = [];        // [{ item, terms }]
 let ready = false;     // data loaded at least once
@@ -216,6 +221,10 @@ function apply(payload) {
 }
 
 async function boot() {
+  // Before the site had countries there was one cache under this name;
+  // nothing reads it any more, so give the space back.
+  try { indexedDB.deleteDatabase('rosa-camina'); } catch { /* no storage */ }
+
   const cached = await cacheGet();
   if (cached) apply(cached.payload);
 

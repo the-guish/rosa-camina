@@ -59,6 +59,10 @@ body {
   color: var(--accent);
 }
 
+.topbar h1 a { color: inherit; text-decoration: none; }
+.topbar h1 .country { color: var(--muted); font-weight: 500; }
+.topbar h1:last-child { margin-bottom: 0; }   /* the home page has no search box */
+
 .searchbox { position: relative; }
 
 .searchbox .icon {
@@ -170,6 +174,24 @@ main {
   font-size: .82rem;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- home: one link per country ---------- */
+
+.countries { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+
+.country-link {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  min-height: var(--tap);
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.country-link:hover, .country-link:focus-visible { border-color: var(--accent); }
+
+.country-link .flag { font-size: 1.4rem; line-height: 1; }
 
 footer {
   margin-top: 1.5rem;
