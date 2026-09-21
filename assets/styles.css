@@ -113,6 +113,73 @@ body {
   cursor: pointer;
 }
 
+/* ---------- scan a barcode ---------- */
+/* Hidden until the script finds a camera and a barcode reader to use. */
+
+.scan {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  width: 100%;
+  min-height: var(--tap);
+  margin-top: .6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scan[hidden] { display: none; }
+
+.scan .icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.scanner {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+  border: 0;
+  padding: calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom));
+  background: #000;
+  color: #fff;
+  text-align: center;
+}
+
+.scanner[open] { display: flex; flex-direction: column; gap: 1rem; }
+
+.scanner video {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+.scanner p { margin: 0; }
+
+.scanner button {
+  min-height: var(--tap);
+  border: 1px solid #fff;
+  border-radius: var(--radius);
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* ---------- results ---------- */
 
 main {
