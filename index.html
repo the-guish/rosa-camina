@@ -25,5 +25,47 @@
   </ul>
 </main>
 
+<footer>
+  <button id="refresh" class="refresh" type="button">Actualizar el sitio</button>
+  <span id="refresh-status" role="status"></span>
+</footer>
+
+<!-- Inline on purpose: a separate file could be the stale copy this is here
+     to replace. A browser keeps the pages, the script and the stylesheet for
+     ten minutes (longer if it feels like it), so after a release a phone can
+     run a new page with the old script. This downloads each of them again,
+     past the cache and into it, drops the cached catalogues, and reloads. -->
+<script>
+document.getElementById('refresh').addEventListener('click', async event => {
+  const button = event.currentTarget;
+  const status = document.getElementById('refresh-status');
+  const pages = [...document.querySelectorAll('.countries a')].map(a => a.href);
+  const files = ['./', 'assets/app.js', 'assets/styles.css', ...pages];
+  button.disabled = true;
+  status.textContent = 'Actualizando…';
+
+  const results = await Promise.allSettled(files.map(async url => {
+    const response = await fetch(url, { cache: 'reload' });
+    if (!response.ok) throw new Error(`${response.status} ${url}`);
+    await response.arrayBuffer();          // read it all, or it is not cached
+  }));
+
+  // The catalogues are versioned by their manifest and refresh themselves;
+  // they are dropped anyway so that this button leaves nothing old behind.
+  for (const page of pages) {
+    const name = 'rosa-camina-' + new URL(page).pathname.split('/').filter(Boolean).pop();
+    try { indexedDB.deleteDatabase(name); } catch { /* no storage, nothing to drop */ }
+  }
+
+  if (results.some(r => r.status === 'rejected')) {
+    status.textContent = 'No se pudo actualizar. ¿Hay conexión?';
+    button.disabled = false;
+    return;
+  }
+  status.textContent = 'Listo.';
+  location.reload();
+});
+</script>
+
 </body>
 </html>
