@@ -16,6 +16,7 @@ const WORLD = countries ? countries.split(' ') : null;
 
 const MANIFEST = 'data/manifest.json';
 const RATES = 'data/rates.json';
+const BARCODES = 'data/barcodes.json';
 const dbName = cc => `rosa-camina-${cc}`;   // same origin, so one cache per country
 const STORE = 'cache';
 const KEY = 'payload';
@@ -28,10 +29,12 @@ const $clear = document.getElementById('clear');
 const $results = document.getElementById('results');
 const $status = document.getElementById('status');
 const $footer = document.getElementById('footer');
+const $scan = document.getElementById('scan');   // absent from a page older than this script
 
 const money = new Intl.NumberFormat(locale, { style: 'currency', currency });
 
 let index = [];        // [{ item, terms }]
+let rows = new Map();  // rowKey -> item, what a barcode points at
 let ready = false;     // data loaded at least once
 let timer = 0;
 
@@ -92,7 +95,12 @@ function terms(text) {
 // Shown on a card of the world page, and searchable there: "argentina yerba".
 const COUNTRY_NAMES = { uy: 'Uruguay', ar: 'Argentina' };
 
+// A row's identity: the store's item id is unique within a store, and a
+// store within a country. On a country page there is no country to name.
+const rowKey = (cc, store, id) => `${cc || ''}|${store}|${id}`;
+
 function buildIndex(items) {
+  rows = new Map(items.map(item => [rowKey(item.c, item.s, item.i), item]));
   index = items.map(item => ({
     item,
     terms: terms([item.n, item.s, item.g, item.c && COUNTRY_NAMES[item.c]].filter(Boolean).join(' '))
@@ -116,6 +124,62 @@ function byUnitPrice(a, b) {
   if (aUnknown !== bUnknown) return aUnknown ? 1 : -1;
   if (!aUnknown && a.pp !== b.pp) return a.pp - b.pp;
   return a.n.localeCompare(b.n, 'es');
+}
+
+// ---------------------------------------------------------------- barcodes
+// A query that is nothing but the digits of a barcode is looked up instead of
+// matched as text, so scanning and typing a code are the same search. The
+// codes are a file beside the catalogue (data/barcodes.json) naming the rows
+// each one stands for; it is read the first time a code is searched, never
+// cached here, and a country that has none yet is simply a code nobody knows.
+
+const CODE = /^\d{8,14}$/;
+
+// A UPC-A is an EAN-13 with a leading zero, and scanners and stores disagree
+// on whether to write it, so codes are compared without leading zeros.
+const codeKey = code => code.replace(/^0+/, '');
+
+let barcodes = null;   // Map: codeKey -> [rowKey], once loaded
+
+async function loadBarcodes() {
+  const sources = WORLD ? WORLD.map(cc => [cc, `../${cc}/${BARCODES}`]) : [['', BARCODES]];
+  const loaded = await Promise.allSettled(sources.map(async ([cc, url]) => {
+    const response = await fetch(url, { cache: 'no-cache' });
+    if (response.status === 404) return [cc, {}];
+    if (!response.ok) throw new Error(`${response.status} ${url}`);
+    return [cc, await response.json()];
+  }));
+  const ok = loaded.filter(r => r.status === 'fulfilled').map(r => r.value);
+  if (!ok.length) throw new Error('no barcodes');
+  const map = new Map();
+  for (const [cc, codes] of ok) {
+    for (const [code, refs] of Object.entries(codes)) {
+      const key = codeKey(code);
+      map.set(key, [...(map.get(key) || []), ...refs.map(ref => rowKey(cc, ref.s, ref.i))]);
+    }
+  }
+  barcodes = map;
+}
+
+async function lookup(code) {
+  if (!barcodes) {
+    $results.replaceChildren();
+    $status.textContent = 'Buscando el código…';
+    try {
+      await loadBarcodes();
+    } catch {
+      if ($q.value.trim() === code) $status.textContent = 'No se pudieron cargar los códigos.';
+      return;
+    }
+    if ($q.value.trim() !== code) return;   // the reader moved on while it loaded
+  }
+  // A code may name a row the catalogue no longer has; those are skipped.
+  const items = (barcodes.get(codeKey(code)) || []).map(key => rows.get(key)).filter(Boolean);
+  if (items.length) render(items.sort(byUnitPrice), []);
+  else {
+    $results.replaceChildren();
+    $status.textContent = `Todavía no hay precios para el código ${code}.`;
+  }
 }
 
 // ----------------------------------------------------------------- render
@@ -179,6 +243,11 @@ function idle() {
 }
 
 function update() {
+  const code = $q.value.trim();
+  if (ready && CODE.test(code)) {
+    lookup(code);
+    return;
+  }
   const wanted = terms($q.value);
   const long = wanted.filter(w => w.length >= MIN_QUERY);
   if (!long.length) {
@@ -216,6 +285,80 @@ $clear.addEventListener('click', () => {
   update();
   $q.focus();
 });
+
+// -------------------------------------------------------------------- scan
+// "Escanear código" reads a barcode with the phone's camera and searches for
+// it. It needs the browser's own BarcodeDetector, which Chrome on Android has
+// and most others do not; where it is missing the button stays hidden and a
+// code can still be typed. Nothing leaves the phone: frames are read here.
+
+const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
+const SCAN_EVERY_MS = 150;
+
+let $scanner = null;   // the dialog, built on first use
+let stream = null;     // the camera, while the dialog is open
+
+function scannerDialog() {
+  if ($scanner) return $scanner;
+  $scanner = document.createElement('dialog');
+  $scanner.className = 'scanner';
+  $scanner.setAttribute('aria-label', 'Escanear código');
+  $scanner.innerHTML = `
+    <video playsinline muted></video>
+    <p>Apuntá la cámara al código de barras.</p>
+    <button type="button">Cancelar</button>`;
+  $scanner.querySelector('button').addEventListener('click', () => $scanner.close());
+  // Every way out (a code read, Cancelar, Escape, the back button) ends here.
+  $scanner.addEventListener('close', () => {
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    stream = null;
+    $scanner.querySelector('video').srcObject = null;
+  });
+  document.body.append($scanner);
+  return $scanner;
+}
+
+async function scan() {
+  const dialog = scannerDialog();
+  const video = dialog.querySelector('video');
+  let mine;
+  try {
+    mine = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  } catch {
+    $status.textContent = 'No se pudo usar la cámara. Revisá el permiso del sitio.';
+    return;
+  }
+  stream = mine;
+  video.srcObject = mine;
+  dialog.showModal();
+  try { await video.play(); } catch { /* closed before the first frame */ }
+
+  const supported = await BarcodeDetector.getSupportedFormats();
+  const detector = new BarcodeDetector({ formats: FORMATS.filter(f => supported.includes(f)) });
+  while (stream === mine) {
+    let found = [];
+    try { found = await detector.detect(video); } catch { /* no frame yet */ }
+    const hit = found.find(b => CODE.test(b.rawValue));
+    if (hit && stream === mine) {
+      dialog.close();
+      $q.value = hit.rawValue;
+      $clear.hidden = false;
+      clearTimeout(timer);
+      update();
+      return;
+    }
+    await new Promise(resolve => setTimeout(resolve, SCAN_EVERY_MS));
+  }
+}
+
+if ($scan && 'BarcodeDetector' in window && navigator.mediaDevices?.getUserMedia) {
+  $scan.hidden = false;
+  $scan.addEventListener('click', scan);
+  // A camera left on behind a hidden tab is a lit indicator and a drained battery.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && $scanner?.open) $scanner.close();
+  });
+}
 
 // -------------------------------------------------------------------- boot
 // Show the cached data at once, then check the manifest and swap in a newer
