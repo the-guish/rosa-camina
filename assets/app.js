@@ -92,7 +92,7 @@ function terms(text) {
 }
 
 // Shown on a card of the world page, and searchable there: "argentina yerba".
-const COUNTRY_NAMES = { uy: 'Uruguay', ar: 'Argentina' };
+const COUNTRY_NAMES = { uy: 'Uruguay', ar: 'Argentina', py: 'Paraguay' };
 
 function buildIndex(items) {
   codes = new Map();
