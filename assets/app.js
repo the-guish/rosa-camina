@@ -20,7 +20,7 @@ const dbName = cc => `rosa-camina-${cc}`;   // same origin, so one cache per cou
 const STORE = 'cache';
 const KEY = 'payload';
 
-const MIN_QUERY = 2;      // below this the list stays empty
+const MIN_QUERY = 3;      // no word this long yet: the list stays empty
 const DEBOUNCE_MS = 150;  // redraw at most this often while typing
 
 const $q = document.getElementById('q');
