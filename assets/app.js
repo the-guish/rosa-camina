@@ -220,7 +220,7 @@ function lookup(code) {
   const items = codes.get(codeKey(code)) || [];
   if (items.length) render([...items].sort(byUnitPrice), []);
   else {
-    $results.replaceChildren();
+    hideRows();
     $status.textContent = `No hay precios para el código ${code}.`;
   }
   return items.length;
@@ -271,10 +271,48 @@ function card(item, wanted) {
   return li;
 }
 
+// A word as short as "car" matches every Carrefour row, and drawing twelve
+// thousand cards freezes a phone for half a minute. So the list is drawn a
+// page at a time, cheapest first, and "Mostrar más" adds the next page.
+const PAGE_SIZE = 100;
+let shown = { items: [], wanted: [], count: 0 };
+
+// Built here rather than written into each page, so that a page older than
+// this script still gets it.
+const $more = document.createElement('button');
+$more.type = 'button';
+$more.className = 'more';
+$more.hidden = true;
+$more.addEventListener('click', () => drawMore());
+$results.after($more);
+
+function drawMore() {
+  const { items, wanted, count } = shown;
+  const next = items.slice(count, count + PAGE_SIZE).map(item => card(item, wanted));
+  $results.append(...next);
+  shown.count = count + next.length;
+  const left = items.length - shown.count;
+  // The last page hides the button; if it had the focus, hand it to the first
+  // new row instead of dropping it on <body>, where Tab starts over.
+  if (left <= 0 && document.activeElement === $more && next.length) {
+    next[0].tabIndex = -1;
+    next[0].focus();
+  }
+  $more.hidden = left <= 0;
+  $more.textContent = `Mostrar ${Math.min(left, PAGE_SIZE)} más (quedan ${left})`;
+}
+
+function hideRows() {
+  $results.replaceChildren();
+  $more.hidden = true;
+}
+
 function render(items, wanted) {
   // No row is singled out: the page states prices and the reader compares
   // them. Deciding which listings are the same product is deferred.
-  $results.replaceChildren(...items.map(item => card(item, wanted)));
+  shown = { items, wanted, count: 0 };
+  $results.replaceChildren();
+  drawMore();
 
   const n = items.length;
   $status.textContent = n ? `${n} ${n === 1 ? 'precio' : 'precios'}` : 'Sin resultados.';
@@ -282,7 +320,7 @@ function render(items, wanted) {
 
 // The landing state, and anything shorter than MIN_QUERY: no rows, just a hint.
 function idle() {
-  $results.replaceChildren();
+  hideRows();
   $status.textContent = ready
     ? `Escribí al menos ${MIN_QUERY} letras para ver precios.`
     : 'Cargando precios…';
