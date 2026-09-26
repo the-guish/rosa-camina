@@ -1,16 +1,10 @@
-# rosa-camina
-Instancia de rose-walks en Español
+# rosacamina.org
 
-## Tu privacidad
+Un sitio web pequeño y práctico para conseguir precios de referencia del supermercado.
 
-rosa camina no te sigue. No pide nombre, ni correo, ni contraseña. No usa
-cookies. No sabe quién sos ni guarda nada tuyo en ninguna parte.
+## Respeto a la privacidad
 
-Lo único que hacemos es contar, como quien cuenta cuánta gente entra a un
-negocio: cuántas personas visitan el sitio cada día, de qué país, y qué
-productos buscan, para saber qué precios agregar y qué mejorar. Esas cuentas
-no tienen nombres. Si dos personas buscan "yerba", vemos dos búsquedas de
-yerba, nada más.
+rosacamina.org no monitorea a sus visitantes individualmente, ni tiene publicidad, ni informa a Google, Meta o cualquier otra empresa acerca de los hábitos de sus visitantes.
 
-Y si tu celular está configurado para pedir que no te sigan, lo respetamos y
-no contamos ni eso.
+
+La performance del sitio se analyza con [Umami](https://umami.is/) un empresa de web analytics de Islandia que respeta la privacidad y sólo recolecta información necesaria para optimizar el rendimiento de la página y almacena datos en servidores localizados en Europa, protegidos por las leyes europeas.
