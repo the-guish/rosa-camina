@@ -248,13 +248,15 @@ function card(item, wanted) {
 
   const size = item.q === undefined ? null : `${item.q} ${item.u}`;
 
+  // A line of a price list: the name and, flush right, the price; under
+  // them the store, the size and the price per kilo or litre.
   li.innerHTML = `
     <div class="name"></div>
+    <span class="price"></span>
     <div class="row">
       ${item.c ? '<span class="tag place"></span>' : ''}
       <span class="tag store"></span>
       ${size ? '<span class="tag size"></span>' : ''}
-      <span class="price"></span>
       ${item.pp !== undefined ? '<span class="unit"></span>' : ''}
     </div>`;
 
