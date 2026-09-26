@@ -7,11 +7,11 @@
    exception at the bottom of the file. */
 
 :root {
-  --paper: #f3eee3;         /* the sheet */
-  --surface: #faf7f0;       /* the search box and the dialog chrome */
+  --paper: #faf8f3;         /* the sheet */
+  --surface: #ffffff;       /* the search box and the dialog chrome */
   --ink: #1c1a17;
   --muted: #6e6759;
-  --line: #d6cfbf;          /* hairline between rows */
+  --line: #ddd7c9;          /* hairline between rows */
   --red: #b42318;           /* one accent: the price, the mark, the link */
   --red-soft: #f4ddd7;
   --radius: 3px;            /* squared, like printed matter */
