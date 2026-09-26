@@ -259,6 +259,22 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+/* results: the next page of a long list, as a link-like line under it */
+.more {
+  display: block;
+  min-height: var(--tap);
+  margin: .5rem auto 0;
+  padding: 0 .75rem;
+  border: 0;
+  background: none;
+  color: var(--red);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.more[hidden] { display: none; }
+
 /* ---------- home: one line per country ---------- */
 
 .countries { list-style: none; margin: 0; padding: 0; }
