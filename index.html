@@ -42,8 +42,20 @@ document.getElementById('refresh').addEventListener('click', async event => {
   const status = document.getElementById('refresh-status');
   const pages = [...document.querySelectorAll('.countries a')].map(a => a.href);
   const files = ['./', 'assets/app.js', 'assets/styles.css', ...pages];
+  const pressed = performance.now();
   button.disabled = true;
   status.textContent = 'Actualizando…';
+  // What the button cost, for the analytics (see assets/app.js). The tracker
+  // may be absent, and then nothing is said; when it is there, the reload
+  // waits up to half a second for the event to leave.
+  const report = async ok => {
+    const ms = Math.round(performance.now() - pressed);
+    const took = ms < 1000 ? '<1s' : ms < 2000 ? '1-2s' : ms < 5000 ? '2-5s' : ms < 10000 ? '5-10s' : '>10s';
+    try {
+      await Promise.race([window.umami?.track('refresh', { ok, ms, took }),
+                          new Promise(resolve => setTimeout(resolve, 500))]);
+    } catch { /* never breaks the page */ }
+  };
 
   const results = await Promise.allSettled(files.map(async url => {
     const response = await fetch(url, { cache: 'reload' });
@@ -61,12 +73,18 @@ document.getElementById('refresh').addEventListener('click', async event => {
   if (results.some(r => r.status === 'rejected')) {
     status.textContent = 'No se pudo actualizar. ¿Hay conexión?';
     button.disabled = false;
+    report(false);
     return;
   }
   status.textContent = 'Listo.';
+  await report(true);
+  // The next country page loaded in this tab reports itself as the rest of
+  // this button's cost (assets/app.js reads and clears the flag).
+  try { sessionStorage.setItem('rosa-camina-refreshed', '1'); } catch { /* no storage */ }
   location.reload();
 });
 </script>
+<script defer src="https://cloud.umami.is/script.js" data-website-id="9cbd65ba-87d6-4dd0-92ed-14cff5979f93" data-domains="rosacamina.org" data-performance="true" data-do-not-track="true"></script>
 
 </body>
 </html>
