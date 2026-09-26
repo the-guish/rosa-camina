@@ -259,6 +259,10 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+/* results: the next page of a long list */
+.more { display: block; margin: .5rem auto 0; }
+.more[hidden] { display: none; }
+
 /* ---------- home: one line per country ---------- */
 
 .countries { list-style: none; margin: 0; padding: 0; }
