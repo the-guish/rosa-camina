@@ -1,27 +1,32 @@
-/* Mobile first: every rule here targets the phone. Wider screens are the
+/* rosa camina looks like what it is: a price list, the kind the Liga de Amas
+   de Casa passed from hand to hand. Paper and ink, one red for what matters,
+   rows with a hairline between them, and nothing decorative. See
+   rose-walks/website/docs/identity.md before changing the look.
+
+   Mobile first: every rule here targets the phone. Wider screens are the
    exception at the bottom of the file. */
 
 :root {
-  --bg: #fdf7f9;
-  --surface: #ffffff;
-  --line: #eadbe1;
-  --text: #2b1a20;
-  --muted: #7d6670;
-  --accent: #9d174d;
-  --accent-soft: #fce7ef;
-  --radius: 14px;
+  --paper: #faf8f3;         /* the sheet */
+  --surface: #ffffff;       /* the search box and the dialog chrome */
+  --ink: #1c1a17;
+  --muted: #6e6759;
+  --line: #ddd7c9;          /* hairline between rows */
+  --red: #b42318;           /* one accent: the price, the mark, the link */
+  --red-soft: #f4ddd7;
+  --radius: 3px;            /* squared, like printed matter */
   --tap: 44px;              /* minimum comfortable tap target */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #171114;
-    --surface: #221820;
-    --line: #3a2a33;
-    --text: #f4e9ee;
-    --muted: #b09aa5;
-    --accent: #f9a8c9;
-    --accent-soft: #3d1c2c;
+    --paper: #171614;
+    --surface: #211f1b;
+    --ink: #ece6d8;
+    --muted: #a39c8c;
+    --line: #37332c;
+    --red: #e8604c;
+    --red-soft: #3c231e;
   }
 }
 
@@ -31,9 +36,9 @@ html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   padding-bottom: calc(2rem + env(safe-area-inset-bottom));
   overflow-wrap: break-word;
 }
@@ -44,8 +49,8 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  border-bottom: 2px solid var(--ink);
   padding: calc(.75rem + env(safe-area-inset-top)) 1rem .75rem;
   padding-left: calc(1rem + env(safe-area-inset-left));
   padding-right: calc(1rem + env(safe-area-inset-right));
@@ -53,15 +58,23 @@ body {
 
 .topbar h1 {
   margin: 0 0 .6rem;
-  font-size: 1.05rem;
-  font-weight: 650;
-  letter-spacing: .02em;
-  color: var(--accent);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1.1;
 }
 
 .topbar h1 a { color: inherit; text-decoration: none; }
-.topbar h1 .country { color: var(--muted); font-weight: 500; }
+.topbar h1 .country { color: var(--muted); font-weight: 500; letter-spacing: 0; }
 .topbar h1:last-child { margin-bottom: 0; }   /* the home page has no search box */
+
+/* the home page: what the name means, in one line */
+.topbar .motto {
+  margin: .15rem 0 0;
+  color: var(--muted);
+  font-size: .9rem;
+  font-style: italic;
+}
 
 .searchbox { position: relative; }
 
@@ -83,16 +96,16 @@ body {
   width: 100%;
   min-height: var(--tap);
   padding: .7rem 2.6rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--ink);
   border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--text);
+  background: var(--surface);
+  color: var(--ink);
   font-size: 16px;            /* 16px or iOS Safari zooms in on focus */
   appearance: none;
 }
 
 #q:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--red);
   outline-offset: 1px;
 }
 
@@ -124,10 +137,10 @@ body {
   width: 100%;
   min-height: var(--tap);
   margin-top: .6rem;
-  border: 1px solid var(--line);
+  border: 1px solid var(--ink);
   border-radius: var(--radius);
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: transparent;
+  color: var(--ink);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -180,86 +193,89 @@ body {
   cursor: pointer;
 }
 
-/* ---------- results ---------- */
+/* ---------- results: the list ---------- */
 
 main {
-  padding: 1rem;
+  padding: 0 1rem;
   padding-left: calc(1rem + env(safe-area-inset-left));
   padding-right: calc(1rem + env(safe-area-inset-right));
 }
 
-.status { margin: .25rem 0 1rem; min-height: 1.3em; color: var(--muted); font-size: .9rem; }
+.status { margin: .75rem 0 .25rem; min-height: 1.3em; color: var(--muted); font-size: .9rem; }
 
-.results { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.results { list-style: none; margin: 0; padding: 0; }
 
+/* One row per listing: the name and the price on the first line, the
+   store, the size and the price per kilo under them. A hairline between
+   rows, no boxes. */
 .card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: .8rem .9rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: .75rem;
+  padding: .65rem 0;
+  border-bottom: 1px solid var(--line);
 }
 
-.card .name { font-weight: 600; margin-bottom: .55rem; }
+.card .name { font-weight: 600; }
 
-/* the words that matched what was typed */
+/* the words that matched what was typed: underlined in red, like a pen */
 .card .name mark {
-  background: var(--accent-soft);
+  background: none;
   color: inherit;
-  border-radius: 3px;
-  padding: 0 .1em;
+  text-decoration: underline;
+  text-decoration-color: var(--red);
+  text-decoration-thickness: 2px;
+  text-underline-offset: .12em;
 }
 
 .card .row {
+  grid-column: 1 / -1;
   display: flex;
   align-items: baseline;
-  gap: .5rem;
+  gap: .6rem;
   flex-wrap: wrap;
+  margin-top: .15rem;
+  color: var(--muted);
+  font-size: .82rem;
 }
 
-.tag {
-  font-size: .78rem;
-  padding: .18rem .5rem;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  white-space: nowrap;
-}
+.tag { white-space: nowrap; }
+
+.tag.store { color: var(--ink); text-transform: uppercase; letter-spacing: .06em; font-size: .72rem; }
 
 /* the world page: which country a price is from */
-.tag.place { background: var(--accent); color: var(--surface); }
-
-.tag.size { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.tag.place { color: var(--red); text-transform: uppercase; letter-spacing: .06em; font-size: .72rem; }
 
 .card .price {
-  margin-left: auto;
-  font-size: 1.15rem;
-  font-weight: 650;
+  align-self: start;
+  font-size: 1.1rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .card .unit {
-  width: 100%;
-  color: var(--muted);
-  font-size: .82rem;
+  margin-left: auto;
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- home: one link per country ---------- */
+/* ---------- home: one line per country ---------- */
 
-.countries { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.countries { list-style: none; margin: 0; padding: 0; }
 
 .country-link {
   display: flex;
   align-items: center;
   gap: .7rem;
   min-height: var(--tap);
-  color: var(--text);
+  padding: .5rem 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
   font-weight: 600;
   text-decoration: none;
 }
 
-.country-link:hover, .country-link:focus-visible { border-color: var(--accent); }
+.country-link:hover, .country-link:focus-visible { color: var(--red); }
 
 .country-link .flag { font-size: 1.4rem; line-height: 1; }
 .country-link .hint { margin-left: auto; color: var(--muted); font-size: .82rem; font-weight: 400; }
@@ -270,7 +286,7 @@ main {
   padding: 0 .75rem;
   border: 0;
   background: none;
-  color: var(--accent);
+  color: var(--red);
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
@@ -286,15 +302,13 @@ footer {
   text-align: center;
 }
 
+footer a { color: inherit; }
+
 /* ---------- wider screens ---------- */
 
 @media (min-width: 640px) {
   .topbar { padding: 1rem 1.5rem; }
-  .topbar h1 { font-size: 1.2rem; }
+  .topbar h1 { font-size: 1.6rem; }
   .topbar > *, main, footer { max-width: 44rem; margin-inline: auto; }
-  main { padding: 1.5rem; }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .card { transition: border-color .15s ease; }
+  main { padding: 0 1.5rem; }
 }
