@@ -112,24 +112,60 @@ let storageOk = null;  // whether IndexedDB answered, once anything has asked
 // ---------------------------------------------------------------- storage
 // Every access is guarded: private windows, blocked site data and Safari's
 // eviction of script-writable storage all make these throw or come back empty.
+// Nor may any of them hang the page: a full disk aborts a write without an
+// error event, and an open waits behind a delete ("Actualizar el sitio")
+// for as long as another tab holds the database. So every access has a
+// deadline, and each connection is closed after use and whenever another
+// tab asks for the database back.
+
+const STORAGE_MS = 3000;
+
+function deadline(promise) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('storage timed out')), STORAGE_MS); }),
+  ]).finally(() => clearTimeout(timer));
+}
 
 function openDb(cc) {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(dbName(cc), 1);
     req.onupgradeneeded = () => req.result.createObjectStore(STORE);
-    req.onsuccess = () => { storageOk = true; resolve(req.result); };
-    req.onerror = () => { storageOk = false; reject(req.error); };
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => db.close();   // another tab is deleting it: let it
+      resolve(db);
+    };
+    req.onerror = () => reject(req.error);
   });
 }
 
+// Runs one transaction on a fresh connection and closes it, whatever happens.
+function withStore(cc, mode, work) {
+  return deadline(openDb(cc).then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, mode);
+    let result;
+    work(tx.objectStore(STORE), value => { result = value; });
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('storage aborted'));   // a full disk says only this
+  }).finally(() => db.close())));
+}
+
+// A cached payload is only used when it looks like one this script can read:
+// a cache written by another version of the script must never stop the page.
+const readable = entry =>
+  !!entry && Array.isArray(entry.payload?.items) && Array.isArray(entry.payload.stores);
+
 async function cacheGet(cc = country) {
   try {
-    const db = await openDb(cc);
-    return await new Promise((resolve, reject) => {
-      const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(KEY);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error);
+    const entry = await withStore(cc, 'readonly', (store, done) => {
+      const req = store.get(KEY);
+      req.onsuccess = () => done(req.result || null);
     });
+    storageOk = true;
+    return readable(entry) ? entry : null;
   } catch {
     storageOk = false;
     return null;   // a cache miss is normal, never fatal
@@ -138,13 +174,8 @@ async function cacheGet(cc = country) {
 
 async function cacheSet(value, cc = country) {
   try {
-    const db = await openDb(cc);
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      tx.objectStore(STORE).put(value, KEY);
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-    });
+    await withStore(cc, 'readwrite', store => store.put(value, KEY));
+    storageOk = true;
   } catch {
     storageOk = false;   // running without storage is fine, it costs a download next time
   }
@@ -201,8 +232,9 @@ function byUnitPrice(a, b) {
   const bUnknown = b.pp === undefined;
   if (aUnknown !== bUnknown) return aUnknown ? 1 : -1;
   if (!aUnknown && a.pp !== b.pp) return a.pp - b.pp;
-  return a.n.localeCompare(b.n, 'es');
+  return byName(a.n, b.n);
 }
+const byName = new Intl.Collator('es').compare;   // localeCompare builds a collator per call
 
 // ---------------------------------------------------------------- barcodes
 // A query that is nothing but the digits of a barcode is looked up instead of
@@ -221,6 +253,7 @@ function lookup(code) {
   if (items.length) render([...items].sort(byUnitPrice), []);
   else {
     $results.replaceChildren();
+    $more.hidden = true;
     $status.textContent = `No hay precios para el código ${code}.`;
   }
   return items.length;
@@ -271,10 +304,35 @@ function card(item, wanted) {
   return li;
 }
 
+// A word as short as "car" matches every Carrefour row, and drawing twelve
+// thousand cards freezes a phone for half a minute. So the list is drawn a
+// page at a time, cheapest first, and "Mostrar más" adds the next page.
+const PAGE_SIZE = 100;
+let shown = { items: [], wanted: [], count: 0 };
+
+const $more = document.createElement('button');
+$more.type = 'button';
+$more.className = 'refresh more';
+$more.hidden = true;
+$more.addEventListener('click', () => drawMore());
+$results.after($more);
+
+function drawMore() {
+  const { items, wanted, count } = shown;
+  const next = items.slice(count, count + PAGE_SIZE);
+  $results.append(...next.map(item => card(item, wanted)));
+  shown.count = count + next.length;
+  const left = items.length - shown.count;
+  $more.hidden = left <= 0;
+  $more.textContent = `Mostrar ${Math.min(left, PAGE_SIZE)} más (quedan ${left})`;
+}
+
 function render(items, wanted) {
   // No row is singled out: the page states prices and the reader compares
   // them. Deciding which listings are the same product is deferred.
-  $results.replaceChildren(...items.map(item => card(item, wanted)));
+  shown = { items, wanted, count: 0 };
+  $results.replaceChildren();
+  drawMore();
 
   const n = items.length;
   $status.textContent = n ? `${n} ${n === 1 ? 'precio' : 'precios'}` : 'Sin resultados.';
@@ -283,6 +341,7 @@ function render(items, wanted) {
 // The landing state, and anything shorter than MIN_QUERY: no rows, just a hint.
 function idle() {
   $results.replaceChildren();
+  $more.hidden = true;
   $status.textContent = ready
     ? `Escribí al menos ${MIN_QUERY} letras para ver precios.`
     : 'Cargando precios…';
@@ -574,11 +633,15 @@ async function boot() {
   // nothing reads it any more, so give the space back.
   try { indexedDB.deleteDatabase('rosa-camina'); } catch { /* no storage */ }
 
-  const cached = await cacheGet();
+  let cached = await cacheGet();
   let usableAt = 0;
   if (cached) {
-    apply(cached.payload);
-    usableAt = performance.now();
+    try {
+      apply(cached.payload);
+      usableAt = performance.now();
+    } catch {
+      cached = null;   // unreadable after all: fetch it as if there were none
+    }
   }
 
   let manifest;
@@ -598,8 +661,8 @@ async function boot() {
 
   try {
     const payload = await download(manifest.url, country, cached ? 'update' : AFTER_REFRESH ? 'refresh' : 'cold');
-    await cacheSet({ version: manifest.version, payload });
     apply(payload);
+    cacheSet({ version: manifest.version, payload });   // not waited for: the prices are on screen
     if (!cached) usableAt = performance.now();
     reportLoad(cached ? 'cache' : 'network', 'updated', usableAt, payload);
   } catch {
@@ -626,7 +689,7 @@ async function loadCountry(cc) {
   if (!cached || cached.version !== manifest.version) {
     const payload = await download(base + manifest.url, cc, cached ? 'update' : AFTER_REFRESH ? 'refresh' : 'cold');
     cached = { version: manifest.version, payload };
-    await cacheSet(cached, cc);
+    cacheSet(cached, cc);   // not waited for
     source = 'network';
   }
   const quotes = await (await fetch(base + RATES, { cache: 'no-cache' })).json();
