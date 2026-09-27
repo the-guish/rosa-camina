@@ -446,10 +446,16 @@ function renderItem(code) {
     event.preventDefault();
     leave();
   });
-  window.scrollTo(0, 0);
-  track('item', { page: PAGE, city: city?.slug || 'none', how: opening, local: !!local });
+  // A redraw of the same item (a city change, a newer build) is not a
+  // visit: it neither scrolls nor counts.
+  if (shownCode !== code) {
+    shownCode = code;
+    window.scrollTo(0, 0);
+    track('item', { page: PAGE, city: city?.slug || 'none', how: opening, local: !!local });
+  }
   opening = 'link';
 }
+let shownCode = null;
 
 // ------------------------------------------------------------------ cities
 // A country page opens with a city picker unless the city is remembered.
@@ -498,6 +504,7 @@ async function chooseCity(chosen, how) {
   // by route() and stays where it is.
   if (!ITEM_ROUTE.test(location.hash)) update();
   footer();
+  return true;   // routed
 }
 
 $city?.addEventListener('click', () => { $cityQ.value = ''; enter(CITY_ROUTE); });
@@ -819,7 +826,10 @@ function reportLoad(source, check, usableAt) {
   track('load', data);
 }
 
-// The city: remembered, the only one, or asked for.
+// The city: remembered, the only one, or asked for, once. A reader who
+// types past the picker without choosing is not sent back to it by a
+// build arriving later; the button in the top bar is there for that.
+let asked = false;
 async function settleCity() {
   const remembered = recall(CITY_KEY);
   const known = cities.find(c => c.slug === remembered);
@@ -827,9 +837,12 @@ async function settleCity() {
   if (cities.length === 1) return chooseCity(cities[0], 'only');
   $city.textContent = 'Elegir ciudad';
   $city.hidden = false;
+  if (asked) return false;
+  asked = true;
   if (ITEM_ROUTE.test(location.hash)) arrivedAt = location.hash;   // shown once the city is known
   history.replaceState(null, '', CITY_ROUTE);   // no entry: there is nothing to go back to yet
   renderCities();
+  return true;
 }
 
 const MANIFEST_TIMEOUT_MS = 10000;
@@ -845,11 +858,11 @@ async function present() {
     $city.textContent = chosen.name;
     const loaded = await loadPrices(chosen);
     if (city === chosen) prices = loaded;
+    route();
   } else {
     city = null;   // none yet, or the build dropped it
-    await settleCity();
+    if (!await settleCity()) route();   // a choice routes by itself
   }
-  route();
   if (!ITEM_ROUTE.test(location.hash)) update();
   footer();
 }
@@ -900,11 +913,10 @@ async function boot() {
   if (cached && cached.version === manifest.version) {
     // The catalogue is current; a city's price file may still be newer.
     const shown = city && cities.find(c => c.slug === city.slug);
+    const changed = JSON.stringify(cities) !== JSON.stringify(fresh);
     cities = fresh;
-    if (!shown || (fresh.find(c => c.slug === shown.slug) || {}).url !== shown.url) {
-      cacheSet(ITEMS_KEY, { ...cached, cities: fresh });
-      await present();
-    }
+    if (changed) cacheSet(ITEMS_KEY, { ...cached, cities: fresh });
+    if (shown ? (fresh.find(c => c.slug === shown.slug) || {}).url !== shown.url : changed) await present();
   } else {
     try {
       const payload = await download(manifest.url, 'items', cached ? 'update' : AFTER_REFRESH ? 'refresh' : 'cold');
