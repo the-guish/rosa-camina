@@ -2809,6 +2809,8 @@
 {"e":"7896423438727","n":"Chocolate M&MS con leche de 45 gr","a":6400.0,"q":45,"u":"g","pa":142222.22,"pu":"kg"},
 {"e":"7896423438765","n":"Chocolate M&Ms Sachet Mani con Chocolate de 148 gr","a":18350.0,"q":148,"u":"g","pa":123986.49,"pu":"kg"},
 {"e":"7896423438772","n":"Chocolate M&Ms Sachet de 132 gr","a":18350.0,"q":132,"u":"g","pa":139015.15,"pu":"kg"},
+{"e":"7896423438994","n":"Chocolate M&MS Snickers de 45 gr","a":8000.0,"q":45,"u":"g","pa":177777.78,"pu":"kg"},
+{"e":"7896423439014","n":"Chocolate Snickers en Barra Dark de 45gr","a":8000.0,"q":45,"u":"g","pa":177777.78,"pu":"kg"},
 {"e":"7896423470994","n":"Barra de Cereal Twix de 40 gr","a":6400.0,"q":40,"u":"g","pa":160000.0,"pu":"kg"},
 {"e":"7896451916709","n":"Malvavisco Docile Twist Color Sabor Vainilla 250 gr","a":18500.0,"q":250,"u":"g","pa":74000.0,"pu":"kg"},
 {"e":"7896691103860","n":"Yogurt Carolina Trozos de Frutilla de 450 gr","a":17900.0,"q":450,"u":"g","pa":39777.78,"pu":"kg"},
@@ -2983,8 +2985,6 @@
 {"e":"9107600000445","n":"Bombitas de Queso SobreMesa x 10 unidades","a":36000.0},
 {"e":"9112221207289","n":"Alfajorcito Belite Low Carb x Uni","a":50000.0},
 {"e":"9777221107122","n":"Trufas Proteicas Belite x 5 Unidades","a":26250.0},
-{"e":"9876221107146","n":"Alfajor Belite Keto con Cobertura x Uni","a":31250.0},
-{"e":"17896423438991","n":"Chocolate M&MS Snickers de 45 gr","a":8000.0,"q":45,"u":"g","pa":177777.78,"pu":"kg"},
-{"e":"17896423439011","n":"Chocolate Snickers en Barra Dark de 45gr","a":8000.0,"q":45,"u":"g","pa":177777.78,"pu":"kg"}
+{"e":"9876221107146","n":"Alfajor Belite Keto con Cobertura x Uni","a":31250.0}
 ]
 }
