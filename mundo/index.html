@@ -1,41 +1,21 @@
 <!DOCTYPE html>
-<html lang="es" data-country="mundo" data-countries="uy ar py" data-locale="es-UY" data-currency="USD">
+<html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#faf8f3">
 <title>rosa camina · Mundo</title>
-<meta name="description" content="Precios de supermercados de Uruguay, Argentina y Paraguay, en dólares.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='none' stroke='%23777' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'><path d='M52 8H42l-7 36'/><path d='M44 20H10l4 28h24z'/><circle cx='34' cy='54' r='4.5'/><circle cx='17' cy='54' r='4.5'/></svg>">
-<link rel="stylesheet" href="../assets/styles.css">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="../assets/styles.css?v=2">
 </head>
 <body>
-
 <header class="topbar">
   <h1><a href="../">rosa camina</a> <span class="country">Mundo</span></h1>
-  <div class="searchbox">
-    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-    <input id="q" type="search" placeholder="Buscar un producto…"
-           aria-label="Buscar un producto" aria-controls="results"
-           autocomplete="off" autocorrect="off" autocapitalize="off"
-           spellcheck="false" enterkeyhint="search">
-    <button id="clear" type="button" aria-label="Limpiar búsqueda" hidden>&times;</button>
-  </div>
-  <button id="scan" class="scan" type="button" hidden>
-    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M18 5h3v3M21 16v3h-3M6 19H3v-3M7 9v6M10 9v6M13 9v6M17 9v6"/></svg>
-    Escanear código
-  </button>
 </header>
-
 <main>
-  <p id="status" class="status" role="status">Cargando precios…</p>
-  <ol id="results" class="results" aria-live="polite"></ol>
+  <p class="status">La vista de todos los países en dólares está en pausa mientras el catálogo pasa a
+  identificar cada producto por su código de barras. Volvé al <a href="../">inicio</a> y elegí un país.</p>
 </main>
-
-<footer id="footer"></footer>
-
-<script type="module" src="../assets/app.js"></script>
-<script defer src="https://cloud.umami.is/script.js" data-website-id="9cbd65ba-87d6-4dd0-92ed-14cff5979f93" data-domains="rosacamina.org" data-performance="true" data-do-not-track="true"></script>
 </body>
 </html>

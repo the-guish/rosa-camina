@@ -1,6 +1,14 @@
 {
-  "version": "feefb8e3",
-  "url": "data/items.json?v=feefb8e3",
-  "count": 3290,
-  "generated": "2026-09-21"
+  "version": "8bcfad0d",
+  "url": "data/items.json?v=8bcfad0d",
+  "count": 2984,
+  "generated": "2026-09-21",
+  "cities": [
+    {
+      "slug": "asuncion",
+      "name": "Asunción",
+      "url": "data/prices-asuncion.json?v=c33bf21f",
+      "count": 2984
+    }
+  ]
 }
