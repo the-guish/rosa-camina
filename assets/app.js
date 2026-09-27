@@ -275,7 +275,7 @@ function enter(hash) {
   location.hash = hash;
 }
 function leave() {
-  if (pushed > 0) { pushed -= 2; history.back(); return; }
+  if (pushed > 0) { history.back(); return; }   // the hashchange it fires takes the one back
   history.replaceState(null, '', location.pathname + location.search + arrivedAt);
   arrivedAt = '';
   route();
@@ -298,6 +298,7 @@ function openItem(code, how) {
 // list: an item page or the city picker in front of it is left first. Only
 // the reader's own input does this, never a redraw.
 function backToList() {
+  arrivedAt = '';   // the reader typed: the list, not the item a link brought them to
   if (ITEM_ROUTE.test(location.hash) || location.hash === CITY_ROUTE) leave();
 }
 
@@ -690,6 +691,7 @@ async function scan() {
     mine = await openCamera();
     await tune(mine);
   } catch {
+    backToList();
     $status.textContent = 'No se pudo usar la cámara. Revisá el permiso del sitio.';
     track('scan', { page: PAGE, outcome: 'no_camera', ms: ms(performance.now() - pressed) });
     return;
@@ -718,6 +720,7 @@ async function scan() {
       else {
         $q.value = hit.rawValue;
         $clear.hidden = false;
+        backToList();
         update();   // "No hay ningún producto…", on the search view
       }
       return;
@@ -833,12 +836,16 @@ const MANIFEST_TIMEOUT_MS = 10000;
 // The catalogue as it is now: the city settled, the route drawn, the list
 // or the item on screen.
 async function present() {
-  if (city) {
-    // The same city, its prices re-read for the build now on screen.
-    const chosen = city;
+  // The city as the build on screen names it: its price file's version
+  // lives in that entry, so the entry must be the current manifest's.
+  const chosen = city && cities.find(c => c.slug === city.slug);
+  if (chosen) {
+    city = chosen;
+    $city.textContent = chosen.name;
     const loaded = await loadPrices(chosen);
     if (city === chosen) prices = loaded;
   } else {
+    city = null;   // none yet, or the build dropped it
     await settleCity();
   }
   route();
@@ -847,6 +854,19 @@ async function present() {
 }
 
 async function boot() {
+  if (!$search || !$item || !$cities) {
+    // A page cached from before this script, run with this script: fetch
+    // the page again past the cache, once, instead of failing on it.
+    try {
+      if (sessionStorage.getItem('rosa-camina-reloaded') !== '1') {
+        sessionStorage.setItem('rosa-camina-reloaded', '1');
+        location.reload();
+        return;
+      }
+    } catch { /* no storage: nothing to do but stop */ }
+    $status.textContent = 'La página quedó vieja. Volvé al inicio y tocá "Actualizar el sitio".';
+    return;
+  }
   remember(COUNTRY_KEY, country);
   try { indexedDB.deleteDatabase('rosa-camina'); } catch { /* the pre-country cache */ }
   show('search');
@@ -875,14 +895,22 @@ async function boot() {
   }
 
   let check = 'current';
-  if (!cached || cached.version !== manifest.version) {
+  const fresh = manifest.cities || [];
+  if (cached && cached.version === manifest.version) {
+    // The catalogue is current; a city's price file may still be newer.
+    const shown = city && cities.find(c => c.slug === city.slug);
+    cities = fresh;
+    if (!shown || (fresh.find(c => c.slug === shown.slug) || {}).url !== shown.url) {
+      await cacheSet(ITEMS_KEY, { ...cached, cities: fresh });
+      await present();
+    }
+  } else {
     try {
-      const fresh = manifest.cities || [];
       const payload = await download(manifest.url, 'items', cached ? 'update' : AFTER_REFRESH ? 'refresh' : 'cold');
       await cacheSet(ITEMS_KEY, { version: manifest.version, payload, cities: fresh });
       applyCatalogue(payload);
       cities = fresh;
-      await present();   // the same city again, with the new build's prices
+      await present();   // the same city again, its prices as this build has them
       if (!cached) usableAt = performance.now();
       check = 'updated';
     } catch {
