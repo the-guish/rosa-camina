@@ -1,6 +1,14 @@
 {
-  "version": "1042e57b",
-  "url": "data/items.json?v=1042e57b",
-  "count": 20924,
-  "generated": "2026-09-26"
+  "version": "99dffe3f",
+  "url": "data/items.json?v=99dffe3f",
+  "count": 16037,
+  "generated": "2026-09-26",
+  "cities": [
+    {
+      "slug": "corrientes",
+      "name": "Corrientes",
+      "url": "data/prices-corrientes.json?v=85bf4835",
+      "count": 16037
+    }
+  ]
 }

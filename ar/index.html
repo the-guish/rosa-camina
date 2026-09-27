@@ -6,14 +6,15 @@
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#faf8f3">
 <title>rosa camina · Argentina</title>
-<meta name="description" content="Comparador de precios de supermercados en Argentina.">
+<meta name="description" content="El precio más bajo de cada producto en los supermercados de tu ciudad, en Argentina.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='none' stroke='%23777' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'><path d='M52 8H42l-7 36'/><path d='M44 20H10l4 28h24z'/><circle cx='34' cy='54' r='4.5'/><circle cx='17' cy='54' r='4.5'/></svg>">
 <link rel="stylesheet" href="../assets/styles.css">
 </head>
 <body>
 
 <header class="topbar">
-  <h1><a href="../">rosa camina</a> <span class="country">Argentina</span></h1>
+  <h1><a href="../">rosa camina</a> <span class="country">Argentina</span>
+    <button id="city" class="city" type="button" aria-label="Cambiar de ciudad" hidden></button></h1>
   <div class="searchbox">
     <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
     <input id="q" type="search" placeholder="Buscar un producto…"
@@ -29,8 +30,18 @@
 </header>
 
 <main>
-  <p id="status" class="status" role="status">Cargando precios…</p>
-  <ol id="results" class="results" aria-live="polite"></ol>
+  <section id="search">
+    <p id="status" class="status" role="status">Cargando el catálogo…</p>
+    <ol id="results" class="results" aria-live="polite"></ol>
+  </section>
+  <article id="item" class="item" hidden></article>
+  <section id="cities" class="cities" hidden>
+    <h2>¿En qué ciudad estás?</h2>
+    <p class="status">Mostramos los precios de los supermercados de tu ciudad. Por ahora, estas:</p>
+    <input id="city-q" type="search" placeholder="Buscar la ciudad…" aria-label="Buscar la ciudad"
+           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <ul id="city-list" class="city-list"></ul>
+  </section>
 </main>
 
 <footer id="footer"></footer>

@@ -328,3 +328,141 @@ footer a { color: inherit; }
   .topbar > *, main, footer { max-width: 44rem; margin-inline: auto; }
   main { padding: 0 1.5rem; }
 }
+
+/* ---------- the city, in the top bar ---------- */
+/* The name of the city after the country, as a small button: tapping it
+   opens the picker. */
+
+.city {
+  margin-left: .4rem;
+  padding: .1rem .45rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.city::after { content: " ▾"; color: var(--muted); }
+.city[hidden] { display: none; }
+
+/* ---------- the city picker ---------- */
+
+.cities h2 { margin: 1rem 0 .25rem; font-size: 1.2rem; }
+
+#city-q {
+  width: 100%;
+  min-height: var(--tap);
+  margin: .5rem 0;
+  padding: .7rem .9rem;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 16px;
+  appearance: none;
+}
+
+#city-q:focus-visible { outline: 2px solid var(--red); outline-offset: 1px; }
+
+.city-list { list-style: none; margin: 0; padding: 0; }
+
+.city-choice {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .75rem;
+  width: 100%;
+  min-height: var(--tap);
+  padding: .6rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.city-choice:hover, .city-choice:focus-visible { color: var(--red); }
+.city-choice[aria-current] .name::after { content: " ✓"; color: var(--red); }
+.city-choice .hint { color: var(--muted); font-size: .8rem; font-weight: 400; white-space: nowrap; }
+
+/* ---------- results: one line per item ---------- */
+
+.card .name { color: inherit; text-decoration: none; }
+.card .name:hover, .card .name:focus-visible { color: var(--red); }
+
+/* the price that matters most, and what it is: "desde" in the city, or
+   the national average when the city has none */
+.card .price { display: flex; flex-direction: column; align-items: flex-end; }
+.card .price small { color: var(--muted); font-size: .68rem; font-weight: 400; text-transform: uppercase; letter-spacing: .06em; }
+
+/* ---------- the item page ---------- */
+
+.item[hidden], .cities[hidden], #search[hidden] { display: none; }
+
+.item .back {
+  display: inline-block;
+  min-height: var(--tap);
+  margin: .5rem 0 0;
+  padding: .6rem 0;
+  color: var(--red);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.item-name { margin: .25rem 0 0; font-size: 1.35rem; line-height: 1.2; letter-spacing: -.01em; }
+.item-size { margin: .2rem 0 0; color: var(--muted); }
+
+.prices { margin-top: 1.25rem; }
+
+.prices h3 {
+  margin: 1.25rem 0 .35rem;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.prices dl { margin: 0; }
+
+.prices dl > div {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  align-items: baseline;
+  padding: .55rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.prices dt { color: var(--muted); font-size: .9rem; }
+.prices dd { margin: 0; }
+
+.prices .amount {
+  font-size: 1.45rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.prices .from .amount { color: var(--red); }
+.prices .stores { display: block; margin-top: .1rem; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+
+.prices .none { margin: .25rem 0 0; padding: .55rem 0; border-bottom: 1px solid var(--line); color: var(--muted); }
+
+.prices .average { display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap; margin: 0; padding: .55rem 0; border-bottom: 1px solid var(--line); }
+.prices .average .unit { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+
+.item .code { margin-top: 1.25rem; color: var(--muted); font-size: .8rem; }
+.item .code span { font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+
+@media (min-width: 640px) {
+  .item-name { font-size: 1.6rem; }
+}

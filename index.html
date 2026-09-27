@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#faf8f3">
 <title>rosa camina</title>
-<meta name="description" content="Comparador de precios de supermercados en Uruguay, Argentina y Paraguay.">
+<meta name="description" content="El precio más bajo de cada producto en los supermercados de tu ciudad. Uruguay, Argentina y Paraguay.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='none' stroke='%23777' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'><path d='M52 8H42l-7 36'/><path d='M44 20H10l4 28h24z'/><circle cx='34' cy='54' r='4.5'/><circle cx='17' cy='54' r='4.5'/></svg>">
 <link rel="stylesheet" href="assets/styles.css">
 </head>
@@ -18,12 +18,11 @@
 </header>
 
 <main>
-  <p class="status">Precios de supermercados. Elegí un país.</p>
+  <p class="status">El precio más bajo de cada producto en los supermercados de tu ciudad. Elegí un país.</p>
   <ul class="countries">
     <li><a class="card country-link" href="uy/"><span class="flag" aria-hidden="true">🇺🇾</span> Uruguay</a></li>
     <li><a class="card country-link" href="ar/"><span class="flag" aria-hidden="true">🇦🇷</span> Argentina</a></li>
     <li><a class="card country-link" href="py/"><span class="flag" aria-hidden="true">🇵🇾</span> Paraguay</a></li>
-    <li><a class="card country-link" href="mundo/"><span class="flag" aria-hidden="true">🌎</span> Mundo <span class="hint">todos los países, en dólares</span></a></li>
   </ul>
 </main>
 
@@ -31,6 +30,20 @@
   <button id="refresh" class="refresh" type="button">Actualizar el sitio</button>
   <span id="refresh-status" role="status"></span>
 </footer>
+
+<!-- The country visited last goes first, marked: the page remembers it
+     (assets/app.js writes it), so a return visit is one tap. -->
+<script>
+try {
+  const last = localStorage.getItem('rosa-camina-country');
+  const link = last && document.querySelector(`.countries a[href="${last}/"]`);
+  if (link) {
+    link.setAttribute('aria-current', 'true');
+    link.insertAdjacentHTML('beforeend', '<span class="hint">la última vez</span>');
+    link.parentElement.parentElement.prepend(link.parentElement);
+  }
+} catch { /* no storage */ }
+</script>
 
 <!-- Inline on purpose: a separate file could be the stale copy this is here
      to replace. A browser keeps the pages, the script and the stylesheet for
