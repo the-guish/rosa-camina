@@ -258,6 +258,7 @@ function route() {
     renderCities();
   } else {
     show('search');
+    if (ready) update();   // the list for what is in the box, redrawn for the city on screen
     $q.focus({ preventScroll: true });
   }
 }
@@ -283,7 +284,21 @@ function leave() {
 let opening = 'link';   // how the next item page was reached, for the analytics
 function openItem(code, how) {
   opening = how;
+  if (ITEM_ROUTE.test(location.hash)) {
+    // From one item straight to another: the same entry, so that "back"
+    // still returns to the list and never to a page the reader left.
+    history.replaceState(null, '', location.pathname + location.search + `#/i/${code}`);
+    route();
+    return;
+  }
   enter(`#/i/${code}`);
+}
+
+// Typing, clearing or escaping in the search box means the reader wants the
+// list: an item page or the city picker in front of it is left first. Only
+// the reader's own input does this, never a redraw.
+function backToList() {
+  if (ITEM_ROUTE.test(location.hash) || location.hash === CITY_ROUTE) leave();
 }
 
 // ----------------------------------------------------------------- render
@@ -467,6 +482,7 @@ $cityQ?.addEventListener('input', renderCities);
 
 async function chooseCity(chosen, how) {
   city = chosen;
+  prices = new Map();   // never the previous city's prices under this one's name
   remember(CITY_KEY, chosen.slug);
   $city.textContent = chosen.name;
   $city.hidden = false;
@@ -531,7 +547,6 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) sendS
 // as the one result it is; Enter, or a scan, opens it.
 function update() {
   const started = performance.now();
-  if (ITEM_ROUTE.test(location.hash)) leave();   // typing over an item: back to the list
   const code = $q.value.trim();
   if (ready && CODE.test(code)) {
     const item = byCode.get(codeKey(code));
@@ -560,6 +575,7 @@ function update() {
 $q.addEventListener('input', () => {
   typedAt = performance.now();
   $clear.hidden = !$q.value;
+  backToList();
   clearTimeout(timer);
   timer = setTimeout(update, DEBOUNCE_MS);
 });
@@ -568,21 +584,30 @@ $q.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
     $q.value = '';
     $clear.hidden = true;
+    backToList();
     update();
   } else if (event.key === 'Enter') {
     event.preventDefault();
     clearTimeout(timer);
+    const code = $q.value.trim();
+    if (ready && CODE.test(code) && byCode.has(codeKey(code))) {
+      noteSearch(code, 'barcode', 1, 1, 0);
+      sendSearch();
+      $q.blur();
+      openItem(codeKey(code), 'barcode');   // from the list or from another item alike
+      return;
+    }
+    backToList();
     update();
     sendSearch();
     $q.blur();
-    const code = $q.value.trim();
-    if (ready && CODE.test(code) && byCode.has(codeKey(code))) openItem(codeKey(code), 'barcode');
   }
 });
 
 $clear.addEventListener('click', () => {
   $q.value = '';
   $clear.hidden = true;
+  backToList();
   clearTimeout(timer);
   update();
   $q.focus();
@@ -796,10 +821,29 @@ async function settleCity() {
   const known = cities.find(c => c.slug === remembered);
   if (known) return chooseCity(known, 'remembered');
   if (cities.length === 1) return chooseCity(cities[0], 'only');
-  $city.hidden = true;
+  $city.textContent = 'Elegir ciudad';
+  $city.hidden = false;
   if (ITEM_ROUTE.test(location.hash)) arrivedAt = location.hash;   // shown once the city is known
   history.replaceState(null, '', CITY_ROUTE);   // no entry: there is nothing to go back to yet
   renderCities();
+}
+
+const MANIFEST_TIMEOUT_MS = 10000;
+
+// The catalogue as it is now: the city settled, the route drawn, the list
+// or the item on screen.
+async function present() {
+  if (city) {
+    // The same city, its prices re-read for the build now on screen.
+    const chosen = city;
+    const loaded = await loadPrices(chosen);
+    if (city === chosen) prices = loaded;
+  } else {
+    await settleCity();
+  }
+  route();
+  if (!ITEM_ROUTE.test(location.hash)) update();
+  footer();
 }
 
 async function boot() {
@@ -808,30 +852,37 @@ async function boot() {
   show('search');
   idle();
 
+  // The cached catalogue is shown at once, cities and all; the manifest is
+  // asked afterwards and a newer build swapped in when it arrives.
   const cached = await cacheGet(ITEMS_KEY);
   let usableAt = 0;
   if (cached) {
     applyCatalogue(cached.payload);
+    cities = cached.cities || [];
+    await present();
     usableAt = performance.now();
   }
 
   let manifest;
   try {
-    manifest = await (await fetch(MANIFEST, { cache: 'no-cache' })).json();
+    const signal = AbortSignal.timeout ? AbortSignal.timeout(MANIFEST_TIMEOUT_MS) : undefined;
+    const response = await fetch(MANIFEST, { cache: 'no-cache', signal });
+    manifest = await response.json();
   } catch {
     if (!cached) $status.textContent = 'No se pudo cargar el catálogo.';
-    else { cities = cached.cities || []; await settleCity(); route(); update(); footer(); }
     reportLoad(cached ? 'cache' : 'none', 'offline', usableAt);
     return;
   }
-  cities = manifest.cities || [];
 
   let check = 'current';
   if (!cached || cached.version !== manifest.version) {
     try {
+      const fresh = manifest.cities || [];
       const payload = await download(manifest.url, 'items', cached ? 'update' : AFTER_REFRESH ? 'refresh' : 'cold');
-      await cacheSet(ITEMS_KEY, { version: manifest.version, payload, cities });
+      await cacheSet(ITEMS_KEY, { version: manifest.version, payload, cities: fresh });
       applyCatalogue(payload);
+      cities = fresh;
+      await present();   // the same city again, with the new build's prices
       if (!cached) usableAt = performance.now();
       check = 'updated';
     } catch {
@@ -843,10 +894,6 @@ async function boot() {
       }
     }
   }
-  await settleCity();
-  route();
-  update();
-  footer();
   reportLoad(cached ? 'cache' : 'network', check, usableAt);
 }
 
