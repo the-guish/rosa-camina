@@ -203,7 +203,11 @@ function terms(text) {
 
 function buildIndex(items) {
   const started = performance.now();
-  byCode = new Map(items.map(item => [item.e, item]));
+  byCode = new Map();
+  for (const item of items) {
+    byCode.set(item.e, item);
+    for (const alias of item.x || []) byCode.set(alias, item);   // another packaging of the same product
+  }
   index = items.map(item => ({ item, terms: terms(item.n) }));
   indexMs = performance.now() - started;
 }
@@ -451,7 +455,7 @@ function renderItem(code) {
       <h3>Promedio en todo el país</h3>
       <p class="average"><b class="amount"></b> ${item.pa !== undefined ? '<span class="unit"></span>' : ''}</p>
     </section>
-    <p class="code">Código de barras <span></span></p>`;
+    <p class="code">Código de barras <span></span>${item.x ? ' <small class="aliases"></small>' : ''}</p>`;
   $item.querySelector('.item-name').textContent = item.n;
   if (size) $item.querySelector('.item-size').textContent = size;
   $item.querySelector('.where').textContent = where;
@@ -466,6 +470,7 @@ function renderItem(code) {
     $item.querySelector('.average .unit').textContent = `${money.format(item.pa)} por ${item.pu}`;
   }
   $item.querySelector('.code span').textContent = item.e;
+  if (item.x) $item.querySelector('.aliases').textContent = `(también ${item.x.join(', ')})`;
   $item.querySelector('.back').addEventListener('click', event => {
     event.preventDefault();
     leave();

@@ -1,20 +1,20 @@
 {
-  "version": "439c27d6",
-  "url": "data/items.json?v=439c27d6",
-  "count": 11424,
+  "version": "bb82eb37",
+  "url": "data/items.json?v=bb82eb37",
+  "count": 11375,
   "generated": "2026-09-27",
   "cities": [
     {
       "slug": "montevideo",
       "name": "Montevideo",
-      "url": "data/prices-montevideo.json?v=dacfd065",
-      "count": 9917
+      "url": "data/prices-montevideo.json?v=3eda765f",
+      "count": 9877
     },
     {
       "slug": "colonia-del-sacramento",
       "name": "Colonia del Sacramento",
-      "url": "data/prices-colonia-del-sacramento.json?v=89fd6eeb",
-      "count": 9239
+      "url": "data/prices-colonia-del-sacramento.json?v=5828efb6",
+      "count": 9200
     }
   ]
 }

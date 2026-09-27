@@ -466,3 +466,4 @@ footer a { color: inherit; }
 @media (min-width: 640px) {
   .item-name { font-size: 1.6rem; }
 }
+.item .code .aliases { display: block; margin-top: .15rem; font-size: .75rem; }
