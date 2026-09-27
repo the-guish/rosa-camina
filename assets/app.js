@@ -248,6 +248,7 @@ function show(view) {
   $search.hidden = view !== 'search';
   $item.hidden = view !== 'item';
   $cities.hidden = view !== 'cities';
+  if (view !== 'item') shownCode = null;   // coming back to an item is a visit again
 }
 
 function route() {
@@ -263,7 +264,13 @@ function route() {
     $q.focus({ preventScroll: true });
   }
 }
-window.addEventListener('hashchange', () => { pushed = Math.max(0, pushed - 1); route(); });
+window.addEventListener('hashchange', () => {
+  pushed = Math.max(0, pushed - 1);
+  const settled = leaving;
+  leaving = null;
+  route();
+  if (settled) settled();
+});
 
 // Views the page itself pushed onto the history, so that "back" can go back
 // through them and never off the site: a visitor who arrived on an item
@@ -275,15 +282,26 @@ function enter(hash) {
   pushed += 2;                          // hashchange takes one back
   location.hash = hash;
 }
+// A back in flight: the hash changes only when the browser has traversed,
+// and until then a second leave would go back twice and an item opened
+// meanwhile would be dropped. So one at a time, and openers wait.
+let leaving = null;   // resolves the promise below on the next hashchange
+let left = Promise.resolve();
 function leave() {
-  if (pushed > 0) { history.back(); return; }   // the hashchange it fires takes the one back
+  if (leaving) return;
+  if (pushed > 0) {
+    left = new Promise(resolve => { leaving = resolve; });
+    history.back();   // the hashchange it fires takes the one back
+    return;
+  }
   history.replaceState(null, '', location.pathname + location.search + arrivedAt);
   arrivedAt = '';
   route();
 }
 
 let opening = 'link';   // how the next item page was reached, for the analytics
-function openItem(code, how) {
+async function openItem(code, how) {
+  if (leaving) await left;   // the list first, then the item on top of it
   opening = how;
   if (ITEM_ROUTE.test(location.hash)) {
     // From one item straight to another: the same entry, so that "back"
@@ -495,8 +513,9 @@ async function chooseCity(chosen, how) {
   $city.textContent = chosen.name;
   $city.hidden = false;
   track('city', { page: PAGE, city: chosen.slug, how });   // remembered, only or chosen
-  const loaded = await loadPrices(chosen);
-  if (city?.slug !== chosen.slug) return;   // another city was chosen while this one loaded
+  const still = () => city?.slug === chosen.slug;   // not replaced by another choice meanwhile
+  const loaded = await loadPrices(chosen, fresh => { if (still()) { prices = fresh; route(); footer(); } });
+  if (!still()) return;
   prices = loaded;
   if (location.hash === CITY_ROUTE) leave();
   else route();
@@ -754,9 +773,12 @@ if ($scan && 'BarcodeDetector' in window && navigator.mediaDevices?.getUserMedia
 // newer version if the build has moved on (stale-while-revalidate). The
 // city's prices follow the same path, keyed by city.
 
+const DOWNLOAD_TIMEOUT_MS = 60000;
+
 async function download(url, what, reason, slug) {
   const started = performance.now();
-  const response = await fetch(url);
+  const signal = AbortSignal.timeout ? AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) : undefined;
+  const response = await fetch(url, { signal });
   const text = await response.text();
   const fetched = performance.now();
   const payload = JSON.parse(text);
@@ -792,21 +814,30 @@ function footer() {
   $footer.textContent = parts.join(' · ');
 }
 
-// The city's prices, as a map by barcode: the cached copy when its version
-// is the manifest's, else downloaded. Offline with nothing cached leaves
-// the city priceless and the page says so on each item. The caller decides
-// whether the map is still wanted: the city may have changed meanwhile.
-async function loadPrices(chosen) {
+// The city's prices, as a map by barcode. Any cached copy is answered at
+// once, stale or not, so that the page never waits on the network for what
+// it already has; a copy older than the manifest's version is downloaded
+// behind it and handed to `onFresh` when it lands. With nothing cached the
+// download is awaited, and offline the city stays priceless and the page
+// says so on each item. The caller decides whether a map is still wanted:
+// the city may have changed meanwhile.
+async function loadPrices(chosen, onFresh) {
   const key = pricesKey(chosen.slug);
   const version = versionIn(chosen.url);
   const cached = await cacheGet(key);
-  if (cached && cached.version === version) return new Map(Object.entries(cached.payload.items));
-  try {
+  const fetchFresh = async () => {
     const payload = await download(chosen.url, 'prices', cached ? 'update' : 'cold', chosen.slug);
     cacheSet(key, { version, payload });   // in the background: the page never waits for storage
     return new Map(Object.entries(payload.items));
+  };
+  if (cached) {
+    if (cached.version !== version) fetchFresh().then(onFresh).catch(() => { /* the copy stays */ });
+    return new Map(Object.entries(cached.payload.items));
+  }
+  try {
+    return await fetchFresh();
   } catch {
-    return cached ? new Map(Object.entries(cached.payload.items)) : new Map();
+    return new Map();
   }
 }
 
@@ -856,7 +887,7 @@ async function present() {
   if (chosen) {
     city = chosen;
     $city.textContent = chosen.name;
-    const loaded = await loadPrices(chosen);
+    const loaded = await loadPrices(chosen, fresh => { if (city === chosen) { prices = fresh; route(); footer(); } });
     if (city === chosen) prices = loaded;
     route();
   } else {
