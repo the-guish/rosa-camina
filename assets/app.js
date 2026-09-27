@@ -260,10 +260,11 @@ function route() {
     renderCities();
   } else {
     show('search');
-    if (ready) update();   // the list for what is in the box, redrawn for the city on screen
-    $q.focus({ preventScroll: true });
+    if (ready) update(true);   // the list for what is in the box, its rows kept
+    if (focusBox) $q.focus({ preventScroll: true });
   }
 }
+let focusBox = false;   // the boot asks for the focus once; nothing else does
 window.addEventListener('hashchange', () => {
   pushed = Math.max(0, pushed - 1);
   const settled = leaving;
@@ -398,10 +399,15 @@ function hideRows() {
   $more.hidden = true;
 }
 
-function render(items, wanted) {
+// keep: a redraw for a new city, a fresher build or a return from an item
+// draws as many rows as were on screen, so "Mostrar más" and the scroll
+// are not lost to something the reader did not do.
+function render(items, wanted, keep = false) {
+  const rows = keep ? Math.max(shown.count, PAGE_SIZE) : PAGE_SIZE;
   shown = { items, wanted, count: 0 };
   $results.replaceChildren();
-  drawMore();
+  while (shown.count < Math.min(rows, items.length)) drawMore();
+  if (!items.length) drawMore();
   const n = items.length;
   $status.textContent = n ? `${n} ${n === 1 ? 'producto' : 'productos'}` : 'Sin resultados.';
 }
@@ -514,15 +520,11 @@ async function chooseCity(chosen, how) {
   $city.hidden = false;
   track('city', { page: PAGE, city: chosen.slug, how });   // remembered, only or chosen
   const still = () => city?.slug === chosen.slug;   // not replaced by another choice meanwhile
-  const loaded = await loadPrices(chosen, fresh => { if (still()) { prices = fresh; route(); footer(); } });
+  const loaded = await loadPrices(chosen, fresh => { if (still()) { prices = fresh; redraw(); } });
   if (!still()) return;
   prices = loaded;
-  if (location.hash === CITY_ROUTE) leave();
-  else route();
-  // The list is redrawn with the city's prices; an item page was redrawn
-  // by route() and stays where it is.
-  if (!ITEM_ROUTE.test(location.hash)) update();
-  footer();
+  if (location.hash === CITY_ROUTE) leave();   // the hashchange redraws the view behind
+  else redraw();
   return true;   // routed
 }
 
@@ -573,13 +575,13 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) sendS
 // Typing redraws the list and never navigates: a code that is being typed
 // digit by digit would open the wrong item half way. A known code is listed
 // as the one result it is; Enter, or a scan, opens it.
-function update() {
+function update(keep = false) {
   const started = performance.now();
   const code = $q.value.trim();
   if (ready && CODE.test(code)) {
     const item = byCode.get(codeKey(code));
     noteSearch(code, 'barcode', 1, item ? 1 : 0, performance.now() - started);
-    if (item) render([item], []);
+    if (item) render([item], [], keep);
     else {
       hideRows();
       $status.textContent = `No hay ningún producto con el código ${code}.`;
@@ -594,8 +596,16 @@ function update() {
     return;
   }
   const items = search(wanted);
-  render(items, wanted);
+  render(items, wanted, keep);
   noteSearch(wanted.join(' '), 'text', wanted.length, items.length, performance.now() - started);
+}
+
+// What is on screen, drawn again with the prices now held: the item page
+// or the list, rows kept. For refreshes that the reader did not ask for.
+function redraw() {
+  if (ITEM_ROUTE.test(location.hash) || focusBox) route();
+  else if (location.hash !== CITY_ROUTE) update(true);
+  footer();
 }
 
 // ------------------------------------------------------------------ events
@@ -887,15 +897,14 @@ async function present() {
   if (chosen) {
     city = chosen;
     $city.textContent = chosen.name;
-    const loaded = await loadPrices(chosen, fresh => { if (city === chosen) { prices = fresh; route(); footer(); } });
+    const loaded = await loadPrices(chosen, fresh => { if (city === chosen) { prices = fresh; redraw(); } });
     if (city === chosen) prices = loaded;
-    route();
+    redraw();
   } else {
-    city = null;   // none yet, or the build dropped it
-    if (!await settleCity()) route();   // a choice routes by itself
+    city = null;         // none yet, or the build dropped it
+    prices = new Map();  // and its prices with it
+    if (!await settleCity()) redraw();   // a choice redraws by itself
   }
-  if (!ITEM_ROUTE.test(location.hash)) update();
-  footer();
 }
 
 async function boot() {
@@ -921,10 +930,12 @@ async function boot() {
   // asked afterwards and a newer build swapped in when it arrives.
   const cached = await cacheGet(ITEMS_KEY);
   let usableAt = 0;
+  focusBox = true;
   if (cached) {
     applyCatalogue(cached.payload);
     cities = cached.cities || [];
     await present();
+    focusBox = false;
     usableAt = performance.now();
   }
 
@@ -955,6 +966,7 @@ async function boot() {
       cacheSet(ITEMS_KEY, { version: manifest.version, payload, cities: fresh });   // in the background
       cities = fresh;
       await present();   // the same city again, its prices as this build has them
+      focusBox = false;
       if (!cached) usableAt = performance.now();
       check = 'updated';
     } catch {
