@@ -513,6 +513,7 @@ function renderCities() {
 $cityQ?.addEventListener('input', renderCities);
 
 async function chooseCity(chosen, how) {
+  chosen = cities.find(c => c.slug === chosen.slug) || chosen;   // the entry of the build on screen
   city = chosen;
   prices = new Map();   // never the previous city's prices under this one's name
   remember(CITY_KEY, chosen.slug);
@@ -520,6 +521,7 @@ async function chooseCity(chosen, how) {
   $city.hidden = false;
   track('city', { page: PAGE, city: chosen.slug, how });   // remembered, only or chosen
   const still = () => city?.slug === chosen.slug;   // not replaced by another choice meanwhile
+  if (location.hash !== CITY_ROUTE) redraw();   // the catalogue at once; the prices follow
   const loaded = await loadPrices(chosen, fresh => { if (still()) { prices = fresh; redraw(); } });
   if (!still()) return;
   prices = loaded;
@@ -603,8 +605,9 @@ function update(keep = false) {
 // What is on screen, drawn again with the prices now held: the item page
 // or the list, rows kept. For refreshes that the reader did not ask for.
 function redraw() {
-  if (ITEM_ROUTE.test(location.hash) || focusBox) route();
-  else if (location.hash !== CITY_ROUTE) update(true);
+  if (location.hash === CITY_ROUTE) renderCities();   // the cities as the build now lists them
+  else if (ITEM_ROUTE.test(location.hash) || focusBox) route();
+  else update(true);
   footer();
 }
 
@@ -928,12 +931,22 @@ async function boot() {
 
   // The cached catalogue is shown at once, cities and all; the manifest is
   // asked afterwards and a newer build swapped in when it arrives.
+  // The manifest is asked for straight away; the cached catalogue is
+  // presented meanwhile, and a cold price download does not hold it up.
+  const asking = (async () => {
+    const signal = AbortSignal.timeout ? AbortSignal.timeout(MANIFEST_TIMEOUT_MS) : undefined;
+    const response = await fetch(MANIFEST, { cache: 'no-cache', signal });
+    return response.json();
+  })();
+  asking.catch(() => { /* handled below */ });
+
   const cached = await cacheGet(ITEMS_KEY);
   let usableAt = 0;
   focusBox = true;
   if (cached) {
     applyCatalogue(cached.payload);
     cities = cached.cities || [];
+    redraw();          // the catalogue on screen before any price file
     await present();
     focusBox = false;
     usableAt = performance.now();
@@ -941,9 +954,7 @@ async function boot() {
 
   let manifest;
   try {
-    const signal = AbortSignal.timeout ? AbortSignal.timeout(MANIFEST_TIMEOUT_MS) : undefined;
-    const response = await fetch(MANIFEST, { cache: 'no-cache', signal });
-    manifest = await response.json();
+    manifest = await asking;
   } catch {
     if (!cached) $status.textContent = 'No se pudo cargar el catálogo.';
     reportLoad(cached ? 'cache' : 'none', 'offline', usableAt);
@@ -965,6 +976,7 @@ async function boot() {
       applyCatalogue(payload);
       cacheSet(ITEMS_KEY, { version: manifest.version, payload, cities: fresh });   // in the background
       cities = fresh;
+      redraw();          // the catalogue on screen before any price file
       await present();   // the same city again, its prices as this build has them
       focusBox = false;
       if (!cached) usableAt = performance.now();
