@@ -176,6 +176,7 @@ async function cacheSet(key, value) {
       tx.objectStore(STORE).put(value, key);
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);   // a commit that fails (quota) aborts without an error event
     });
   } catch {
     storageOk = false;
@@ -489,7 +490,7 @@ async function chooseCity(chosen, how) {
   $city.hidden = false;
   track('city', { page: PAGE, city: chosen.slug, how });   // remembered, only or chosen
   const loaded = await loadPrices(chosen);
-  if (city !== chosen) return;   // another city was chosen while this one loaded
+  if (city?.slug !== chosen.slug) return;   // another city was chosen while this one loaded
   prices = loaded;
   if (location.hash === CITY_ROUTE) leave();
   else route();
@@ -795,7 +796,7 @@ async function loadPrices(chosen) {
   if (cached && cached.version === version) return new Map(Object.entries(cached.payload.items));
   try {
     const payload = await download(chosen.url, 'prices', cached ? 'update' : 'cold', chosen.slug);
-    await cacheSet(key, { version, payload });
+    cacheSet(key, { version, payload });   // in the background: the page never waits for storage
     return new Map(Object.entries(payload.items));
   } catch {
     return cached ? new Map(Object.entries(cached.payload.items)) : new Map();
@@ -901,14 +902,14 @@ async function boot() {
     const shown = city && cities.find(c => c.slug === city.slug);
     cities = fresh;
     if (!shown || (fresh.find(c => c.slug === shown.slug) || {}).url !== shown.url) {
-      await cacheSet(ITEMS_KEY, { ...cached, cities: fresh });
+      cacheSet(ITEMS_KEY, { ...cached, cities: fresh });
       await present();
     }
   } else {
     try {
       const payload = await download(manifest.url, 'items', cached ? 'update' : AFTER_REFRESH ? 'refresh' : 'cold');
-      await cacheSet(ITEMS_KEY, { version: manifest.version, payload, cities: fresh });
       applyCatalogue(payload);
+      cacheSet(ITEMS_KEY, { version: manifest.version, payload, cities: fresh });   // in the background
       cities = fresh;
       await present();   // the same city again, its prices as this build has them
       if (!cached) usableAt = performance.now();

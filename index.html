@@ -55,7 +55,6 @@ document.getElementById('refresh').addEventListener('click', async event => {
   const button = event.currentTarget;
   const status = document.getElementById('refresh-status');
   const pages = [...document.querySelectorAll('.countries a')].map(a => a.href);
-  const files = ['./', 'assets/app.js', 'assets/styles.css', ...pages];
   const pressed = performance.now();
   button.disabled = true;
   status.textContent = 'Actualizando…';
@@ -71,10 +70,19 @@ document.getElementById('refresh').addEventListener('click', async event => {
     } catch { /* never breaks the page */ }
   };
 
-  const results = await Promise.allSettled(files.map(async url => {
+  // The pages first, then whatever assets they name, version query and
+  // all: the browser's cache is keyed by the full URL, so the copies to
+  // replace are the ones the pages actually load, not a guess at them.
+  const reload = async url => {
     const response = await fetch(url, { cache: 'reload' });
     if (!response.ok) throw new Error(`${response.status} ${url}`);
-    await response.arrayBuffer();          // read it all, or it is not cached
+    return response.text();                // read it all, or it is not cached
+  };
+  const results = await Promise.allSettled([location.href, ...pages].map(async url => {
+    const html = await reload(url);
+    const assets = [...html.matchAll(/(?:src|href)="((?:\.\.\/)?assets\/[^"]+)"/g)]
+      .map(m => new URL(m[1], url).href);
+    await Promise.all([...new Set(assets)].map(reload));
   }));
 
   // The catalogues are versioned by their manifest and refresh themselves;
