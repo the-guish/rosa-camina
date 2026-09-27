@@ -124,22 +124,36 @@ let indexMs = 0;
 // Every access is guarded: private windows, blocked site data and Safari's
 // eviction of script-writable storage all make these throw or come back empty.
 
+// One connection per access, closed after it, so that a later version bump
+// finds no connection held open by another tab; an old tab holding one
+// blocks the upgrade, and then the open is given up rather than waited for
+// (a cache miss costs a download, a hang costs the page).
+const OPEN_TIMEOUT_MS = 3000;
+
 function openDb() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(dbName(country), 2);
+    const giveUp = setTimeout(() => reject(new Error('IndexedDB open timed out')), OPEN_TIMEOUT_MS);
     req.onupgradeneeded = () => {
       // Version 1 held one payload under one key; its shape is gone.
       if (req.result.objectStoreNames.contains(STORE)) req.result.deleteObjectStore(STORE);
       req.result.createObjectStore(STORE);
     };
-    req.onsuccess = () => { storageOk = true; resolve(req.result); };
-    req.onerror = () => { storageOk = false; reject(req.error); };
+    req.onblocked = () => { clearTimeout(giveUp); reject(new Error('IndexedDB upgrade blocked')); };
+    req.onsuccess = () => {
+      clearTimeout(giveUp);
+      storageOk = true;
+      req.result.onversionchange = () => req.result.close();   // let a newer script upgrade
+      resolve(req.result);
+    };
+    req.onerror = () => { clearTimeout(giveUp); storageOk = false; reject(req.error); };
   });
 }
 
 async function cacheGet(key) {
+  let db;
   try {
-    const db = await openDb();
+    db = await openDb();
     return await new Promise((resolve, reject) => {
       const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
       req.onsuccess = () => resolve(req.result || null);
@@ -148,12 +162,15 @@ async function cacheGet(key) {
   } catch {
     storageOk = false;
     return null;
+  } finally {
+    db?.close();
   }
 }
 
 async function cacheSet(key, value) {
+  let db;
   try {
-    const db = await openDb();
+    db = await openDb();
     await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, 'readwrite');
       tx.objectStore(STORE).put(value, key);
@@ -162,6 +179,8 @@ async function cacheSet(key, value) {
     });
   } catch {
     storageOk = false;
+  } finally {
+    db?.close();
   }
 }
 
@@ -211,7 +230,7 @@ function byUnitAverage(a, b) {
 // A query that is nothing but the digits of a barcode is looked up instead
 // of matched as text: it opens the item, or says there is none.
 
-const CODE = /^\d{8,14}$/;
+const CODE = /^\d{7,14}$/;   // the catalogue drops leading zeros: an EAN-8 can be seven
 // A UPC-A is an EAN-13 with a leading zero, and scanners and stores disagree
 // on whether to write it. The catalogue drops leading zeros; so does this.
 const codeKey = code => code.replace(/^0+/, '');
@@ -248,10 +267,16 @@ window.addEventListener('hashchange', () => { pushed = Math.max(0, pushed - 1); 
 // through them and never off the site: a visitor who arrived on an item
 // link has nothing behind it, and leaves the view in place instead.
 let pushed = 0;
-function enter(hash) { pushed += 2; location.hash = hash; }   // hashchange takes one back
+let arrivedAt = '';   // an item link a first visit came in on, kept while the city is asked
+function enter(hash) {
+  if (location.hash === hash) return;   // already there: no entry, no hashchange
+  pushed += 2;                          // hashchange takes one back
+  location.hash = hash;
+}
 function leave() {
   if (pushed > 0) { pushed -= 2; history.back(); return; }
-  history.replaceState(null, '', location.pathname + location.search);
+  history.replaceState(null, '', location.pathname + location.search + arrivedAt);
+  arrivedAt = '';
   route();
 }
 
@@ -446,10 +471,14 @@ async function chooseCity(chosen, how) {
   $city.textContent = chosen.name;
   $city.hidden = false;
   track('city', { page: PAGE, city: chosen.slug, how });   // remembered, only or chosen
-  await loadPrices(chosen);
+  const loaded = await loadPrices(chosen);
+  if (city !== chosen) return;   // another city was chosen while this one loaded
+  prices = loaded;
   if (location.hash === CITY_ROUTE) leave();
   else route();
-  update();
+  // The list is redrawn with the city's prices; an item page was redrawn
+  // by route() and stays where it is.
+  if (!ITEM_ROUTE.test(location.hash)) update();
   footer();
 }
 
@@ -497,13 +526,17 @@ function sendSearch() {
 
 document.addEventListener('visibilitychange', () => { if (document.hidden) sendSearch(); });
 
+// Typing redraws the list and never navigates: a code that is being typed
+// digit by digit would open the wrong item half way. A known code is listed
+// as the one result it is; Enter, or a scan, opens it.
 function update() {
   const started = performance.now();
+  if (ITEM_ROUTE.test(location.hash)) leave();   // typing over an item: back to the list
   const code = $q.value.trim();
   if (ready && CODE.test(code)) {
-    const found = byCode.has(codeKey(code));
-    noteSearch(code, 'barcode', 1, found ? 1 : 0, performance.now() - started);
-    if (found) openItem(codeKey(code), 'barcode');
+    const item = byCode.get(codeKey(code));
+    noteSearch(code, 'barcode', 1, item ? 1 : 0, performance.now() - started);
+    if (item) render([item], []);
     else {
       hideRows();
       $status.textContent = `No hay ningún producto con el código ${code}.`;
@@ -542,10 +575,10 @@ $q.addEventListener('keydown', event => {
     update();
     sendSearch();
     $q.blur();
+    const code = $q.value.trim();
+    if (ready && CODE.test(code) && byCode.has(codeKey(code))) openItem(codeKey(code), 'barcode');
   }
 });
-
-$q.addEventListener('focus', () => { if (ITEM_ROUTE.test(location.hash)) leave(); });
 
 $clear.addEventListener('click', () => {
   $q.value = '';
@@ -658,11 +691,9 @@ async function scan() {
       });
       if (known) openItem(code, 'scan');
       else {
-        if (ITEM_ROUTE.test(location.hash)) leave();
         $q.value = hit.rawValue;
         $clear.hidden = false;
-        hideRows();
-        $status.textContent = `No hay ningún producto con el código ${hit.rawValue}.`;
+        update();   // "No hay ningún producto…", on the search view
       }
       return;
     }
@@ -725,25 +756,21 @@ function footer() {
   $footer.textContent = parts.join(' · ');
 }
 
-// The city's prices: cached copy first when its version is the manifest's,
-// else downloaded. Offline with nothing cached leaves the city priceless
-// and the page says so on each item.
+// The city's prices, as a map by barcode: the cached copy when its version
+// is the manifest's, else downloaded. Offline with nothing cached leaves
+// the city priceless and the page says so on each item. The caller decides
+// whether the map is still wanted: the city may have changed meanwhile.
 async function loadPrices(chosen) {
   const key = pricesKey(chosen.slug);
   const version = versionIn(chosen.url);
   const cached = await cacheGet(key);
-  if (cached && cached.version === version) {
-    prices = new Map(Object.entries(cached.payload.items));
-    return 'cache';
-  }
+  if (cached && cached.version === version) return new Map(Object.entries(cached.payload.items));
   try {
     const payload = await download(chosen.url, 'prices', cached ? 'update' : 'cold', chosen.slug);
     await cacheSet(key, { version, payload });
-    prices = new Map(Object.entries(payload.items));
-    return 'network';
+    return new Map(Object.entries(payload.items));
   } catch {
-    prices = cached ? new Map(Object.entries(cached.payload.items)) : new Map();
-    return cached ? 'cache' : 'none';
+    return cached ? new Map(Object.entries(cached.payload.items)) : new Map();
   }
 }
 
@@ -770,6 +797,7 @@ async function settleCity() {
   if (known) return chooseCity(known, 'remembered');
   if (cities.length === 1) return chooseCity(cities[0], 'only');
   $city.hidden = true;
+  if (ITEM_ROUTE.test(location.hash)) arrivedAt = location.hash;   // shown once the city is known
   history.replaceState(null, '', CITY_ROUTE);   // no entry: there is nothing to go back to yet
   renderCities();
 }
